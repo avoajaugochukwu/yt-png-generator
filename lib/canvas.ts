@@ -24,6 +24,7 @@ interface SizeConfig {
 }
 
 const SIZE_CONFIGS: Record<VisualElement['type'], SizeConfig> = {
+  'main-title': { maxWidth: 1400, fontSize: 120 },
   'listicle-heading': { maxWidth: 1200, fontSize: 84 },
   'point-of-interest': { maxWidth: 800, fontSize: 63 },
 };
@@ -82,13 +83,14 @@ export function generatePng(
   ctx.fillStyle = options.backgroundColor;
   ctx.fillRect(0, 0, config.maxWidth, canvasHeight);
 
-  // Text — uppercase, left-aligned, vertically centered
+  // Text — uppercase, vertically centered
+  const isCentered = element.type === 'main-title';
   ctx.fillStyle = options.textColor;
   ctx.font = fontSpec;
   ctx.textBaseline = 'middle';
-  ctx.textAlign = 'left';
+  ctx.textAlign = isCentered ? 'center' : 'left';
 
-  const startX = PADDING;
+  const startX = isCentered ? config.maxWidth / 2 : PADDING;
   const centerY = canvasHeight / 2;
   const firstLineY = centerY - ((lines.length - 1) * lineHeight) / 2;
 

@@ -7,6 +7,12 @@ import type {
   CustomizationOptions,
   TimelineEntry,
 } from '@/lib/types';
+import {
+  saveSession,
+  getAllSessions,
+  deleteSession,
+  type SavedSession,
+} from '@/lib/idb';
 import InputSection from './InputSection';
 import CustomizationPanel from './CustomizationPanel';
 import GenerateButton from './GenerateButton';
@@ -24,9 +30,16 @@ export default function ForgeForm() {
   });
   const [customInstructions, setCustomInstructions] = useState('');
   const [zipUrl, setZipUrl] = useState<string | null>(null);
+  const [zipBase64, setZipBase64] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntry[] | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [sessions, setSessions] = useState<SavedSession[]>([]);
+
+  // Load past sessions on mount
+  useEffect(() => {
+    getAllSessions().then(setSessions).catch(() => {});
+  }, []);
 
   // Cleanup blob URL on unmount or new generation
   useEffect(() => {
@@ -121,6 +134,8 @@ export default function ForgeForm() {
 
       const data = await res.json();
       setTimeline(data.timeline);
+      setZipBase64(data.zip);
+
       const byteString = atob(data.zip);
       const bytes = new Uint8Array(byteString.length);
       for (let i = 0; i < byteString.length; i++) {
@@ -130,13 +145,59 @@ export default function ForgeForm() {
       const url = URL.createObjectURL(blob);
       setZipUrl(url);
       setStep('done');
+
+      // Save to IndexedDB
+      const session: SavedSession = {
+        id: crypto.randomUUID(),
+        scriptText,
+        elements,
+        timeline: data.timeline,
+        zipBase64: data.zip,
+        customization,
+        customInstructions,
+        createdAt: Date.now(),
+      };
+      await saveSession(session);
+      setSessions(await getAllSessions());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation failed');
       setStep('customizing');
     } finally {
       setIsLoading(false);
     }
-  }, [elements, customization, zipUrl]);
+  }, [elements, customization, zipUrl, scriptText, customInstructions]);
+
+  function loadSession(session: SavedSession) {
+    if (zipUrl) URL.revokeObjectURL(zipUrl);
+
+    setScriptText(session.scriptText);
+    setElements(session.elements as VisualElement[]);
+    setTimeline(session.timeline as TimelineEntry[] | null);
+    setCustomization(session.customization);
+    setCustomInstructions(session.customInstructions);
+
+    if (session.zipBase64) {
+      const byteString = atob(session.zipBase64);
+      const bytes = new Uint8Array(byteString.length);
+      for (let i = 0; i < byteString.length; i++) {
+        bytes[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'application/zip' });
+      setZipUrl(URL.createObjectURL(blob));
+      setZipBase64(session.zipBase64);
+    } else {
+      setZipUrl(null);
+      setZipBase64(null);
+    }
+
+    setStep('done');
+    setError('');
+  }
+
+  async function handleDeleteSession(id: string) {
+    await deleteSession(id);
+    setSessions(await getAllSessions());
+  }
 
   function handleReset() {
     if (zipUrl) URL.revokeObjectURL(zipUrl);
@@ -145,6 +206,7 @@ export default function ForgeForm() {
     setAudioFile(null);
     setElements(null);
     setZipUrl(null);
+    setZipBase64(null);
     setTimeline(null);
     setError('');
     setCustomInstructions('');
@@ -189,12 +251,14 @@ export default function ForgeForm() {
               <div key={el.id} className="flex items-center gap-2 text-sm">
                 <span
                   className={`shrink-0 inline-block rounded px-1.5 py-0.5 text-xs font-medium ${
-                    el.type === 'listicle-heading'
-                      ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                      : 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300'
+                    el.type === 'main-title'
+                      ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
+                      : el.type === 'listicle-heading'
+                        ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                        : 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300'
                   }`}
                 >
-                  {el.type === 'listicle-heading' ? 'Heading' : 'POI'}
+                  {el.type === 'main-title' ? 'Title' : el.type === 'listicle-heading' ? 'Heading' : 'POI'}
                 </span>
                 <span className="text-neutral-700 dark:text-neutral-300">
                   {el.text}
@@ -232,6 +296,46 @@ export default function ForgeForm() {
       </div>
 
       <DownloadArea zipUrl={zipUrl} elements={elements} scriptText={scriptText} timeline={timeline} />
+
+      {sessions.length > 0 && (
+        <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 overflow-hidden">
+          <h3 className="px-4 py-3 text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800">
+            Past Sessions
+          </h3>
+          <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+            {sessions.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-center justify-between px-4 py-3 text-sm"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-neutral-800 dark:text-neutral-200 truncate">
+                    {s.scriptText.split(/[\n.!?]/, 1)[0].trim().slice(0, 80) || 'Untitled'}
+                  </p>
+                  <p className="text-xs text-neutral-400 mt-0.5">
+                    {new Date(s.createdAt).toLocaleDateString()} &middot;{' '}
+                    {(s.elements as unknown[]).length} elements
+                  </p>
+                </div>
+                <div className="flex gap-2 ml-3 shrink-0">
+                  <button
+                    onClick={() => loadSession(s)}
+                    className="rounded px-3 py-1.5 text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  >
+                    Load
+                  </button>
+                  <button
+                    onClick={() => handleDeleteSession(s.id)}
+                    className="rounded px-3 py-1.5 text-xs font-medium border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

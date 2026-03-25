@@ -11,7 +11,7 @@ export interface TranscribeResponse {
 
 export interface VisualElement {
   id: string;
-  type: 'listicle-heading' | 'point-of-interest';
+  type: 'main-title' | 'listicle-heading' | 'point-of-interest';
   text: string;
   timestamp?: number;
   timestampEnd?: number;

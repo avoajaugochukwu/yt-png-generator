@@ -75,12 +75,14 @@ export default function DownloadArea({ zipUrl, elements, scriptText, timeline }:
                   <td className="px-4 py-2">
                     <span
                       className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${
-                        entry.type === 'listicle-heading'
-                          ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                          : 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300'
+                        entry.type === 'main-title'
+                          ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
+                          : entry.type === 'listicle-heading'
+                            ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                            : 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300'
                       }`}
                     >
-                      {entry.type === 'listicle-heading' ? 'Heading' : 'POI'}
+                      {entry.type === 'main-title' ? 'Title' : entry.type === 'listicle-heading' ? 'Heading' : 'POI'}
                     </span>
                   </td>
                   <td className="px-4 py-2 font-mono text-xs text-neutral-500 whitespace-nowrap">
