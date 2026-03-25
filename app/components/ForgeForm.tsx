@@ -7,6 +7,12 @@ import type {
   CustomizationOptions,
   TimelineEntry,
 } from '@/lib/types';
+import {
+  saveCurrentSession,
+  getCurrentSession,
+  clearCurrentSession,
+  type CurrentSession,
+} from '@/lib/idb';
 import InputSection from './InputSection';
 import CustomizationPanel from './CustomizationPanel';
 import GenerateButton from './GenerateButton';
@@ -24,9 +30,48 @@ export default function ForgeForm() {
   });
   const [customInstructions, setCustomInstructions] = useState('');
   const [zipUrl, setZipUrl] = useState<string | null>(null);
+  const [zipBase64, setZipBase64] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntry[] | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Restore current session from IndexedDB on mount
+  useEffect(() => {
+    getCurrentSession().then((session) => {
+      if (!session) return;
+      setScriptText(session.scriptText);
+      setElements(session.elements as VisualElement[] | null);
+      setTimeline(session.timeline as TimelineEntry[] | null);
+      setCustomization(session.customization);
+      setCustomInstructions(session.customInstructions);
+      setStep(session.step as AppStep);
+
+      if (session.zipBase64) {
+        setZipBase64(session.zipBase64);
+        const byteString = atob(session.zipBase64);
+        const bytes = new Uint8Array(byteString.length);
+        for (let i = 0; i < byteString.length; i++) {
+          bytes[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: 'application/zip' });
+        setZipUrl(URL.createObjectURL(blob));
+      }
+    }).catch(() => {});
+  }, []);
+
+  // Persist current session to IndexedDB on state changes
+  useEffect(() => {
+    const session: CurrentSession = {
+      scriptText,
+      elements,
+      timeline,
+      zipBase64,
+      customization,
+      customInstructions,
+      step,
+    };
+    saveCurrentSession(session).catch(() => {});
+  }, [scriptText, elements, timeline, zipBase64, customization, customInstructions, step]);
 
   // Cleanup blob URL on unmount or new generation
   useEffect(() => {
@@ -121,6 +166,7 @@ export default function ForgeForm() {
 
       const data = await res.json();
       setTimeline(data.timeline);
+      setZipBase64(data.zip);
 
       const byteString = atob(data.zip);
       const bytes = new Uint8Array(byteString.length);
@@ -146,13 +192,27 @@ export default function ForgeForm() {
     setAudioFile(null);
     setElements(null);
     setZipUrl(null);
+    setZipBase64(null);
     setTimeline(null);
     setError('');
     setCustomInstructions('');
+    clearCurrentSession().catch(() => {});
   }
 
   return (
     <div className="space-y-6">
+      {step !== 'input' && (
+        <div className="flex justify-end">
+          <button
+            onClick={handleReset}
+            disabled={isLoading}
+            className="rounded-lg border border-neutral-300 dark:border-neutral-700 px-4 py-2 text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
+          >
+            Start Over
+          </button>
+        </div>
+      )}
+
       {error && (
         <div className="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950 px-4 py-3 text-sm text-red-700 dark:text-red-300 flex items-center justify-between">
           <span>{error}</span>
