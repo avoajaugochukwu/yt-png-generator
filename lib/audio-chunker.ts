@@ -8,8 +8,8 @@ import type { TranscribeResponse, TranscriptSegment } from '@/lib/types';
 
 const execFile = promisify(execFileCb);
 
-const FFMPEG = '/opt/homebrew/bin/ffmpeg';
-const FFPROBE = '/opt/homebrew/bin/ffprobe';
+const FFMPEG = process.env.FFMPEG_PATH || '/usr/bin/ffmpeg';
+const FFPROBE = process.env.FFPROBE_PATH || '/usr/bin/ffprobe';
 const MAX_CHUNK_SIZE = 24 * 1024 * 1024; // 24MB safety margin
 const MAX_CONCURRENT = 3;
 
