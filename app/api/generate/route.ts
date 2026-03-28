@@ -3,6 +3,13 @@ import { generatePng } from '@/lib/canvas';
 import { createZip } from '@/lib/zip';
 import type { GenerateRequest, TimelineEntry } from '@/lib/types';
 
+function formatFilenameTimestamp(seconds: number | undefined | null): string {
+  if (seconds == null) return '';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}m${String(s).padStart(2, '0')}s`;
+}
+
 function formatTimestamp(seconds: number | undefined | null): string | null {
   if (seconds == null) return null;
   const h = Math.floor(seconds / 3600);
@@ -34,7 +41,8 @@ export async function POST(request: NextRequest) {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
         .slice(0, 60);
-      const filename = `${String(i + 1).padStart(2, '0')}-${slug}.png`;
+      const ts = formatFilenameTimestamp(element.timestamp);
+      const filename = `${String(i + 1).padStart(2, '0')}-${ts ? `${ts}-` : ''}${slug}.png`;
 
       const { buffer, width, height } = generatePng(element, body.customization);
 
