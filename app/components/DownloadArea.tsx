@@ -9,22 +9,35 @@ interface DownloadAreaProps {
   timeline: TimelineEntry[] | null;
 }
 
-function deriveFilename(script: string): string {
-  const slug = script
+function deriveSlug(script: string): string {
+  return script
     .trim()
     .split(/[\n.!?]/, 1)[0]
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
-    .slice(0, 50);
-  return `${slug || 'video-assets'}.zip`;
+    .slice(0, 50) || 'video-assets';
+}
+
+function downloadManifest(timeline: TimelineEntry[], slug: string) {
+  const manifest = {
+    generatedAt: new Date().toISOString(),
+    entries: timeline,
+  };
+  const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${slug}-manifest.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function DownloadArea({ zipUrl, elements, scriptText, timeline }: DownloadAreaProps) {
   if (!zipUrl || !elements) return null;
 
-  const filename = deriveFilename(scriptText);
+  const slug = deriveSlug(scriptText);
 
   return (
     <div className="space-y-4">
@@ -36,13 +49,25 @@ export default function DownloadArea({ zipUrl, elements, scriptText, timeline }:
           Generated {elements.length} PNG{elements.length !== 1 ? 's' : ''}.
         </p>
 
-        <a
-          href={zipUrl}
-          download={filename}
-          className="inline-block rounded-lg bg-green-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition-colors"
-        >
-          Download ZIP
-        </a>
+        <div className="flex gap-3">
+          <a
+            href={zipUrl}
+            download={`${slug}.zip`}
+            className="inline-block rounded-lg bg-green-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+          >
+            Download ZIP
+          </a>
+
+          {timeline && timeline.length > 0 && (
+            <button
+              type="button"
+              onClick={() => downloadManifest(timeline, slug)}
+              className="inline-block rounded-lg bg-neutral-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-neutral-700 transition-colors"
+            >
+              Download Manifest
+            </button>
+          )}
+        </div>
       </div>
 
       {timeline && timeline.length > 0 && (
@@ -69,7 +94,7 @@ export default function DownloadArea({ zipUrl, elements, scriptText, timeline }:
                   <td className="px-4 py-2 font-mono text-xs text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
                     {entry.filename}
                   </td>
-                  <td className="px-4 py-2 text-neutral-700 dark:text-neutral-300">
+                  <td className="px-4 py-2 text-neutral-700 dark:text-neutral-300 whitespace-nowrap">
                     {entry.text}
                   </td>
                   <td className="px-4 py-2">
