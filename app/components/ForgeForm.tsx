@@ -17,6 +17,7 @@ import InputSection from './InputSection';
 import CustomizationPanel from './CustomizationPanel';
 import GenerateButton from './GenerateButton';
 import DownloadArea from './DownloadArea';
+import VideoOverlaySection from './VideoOverlaySection';
 
 export default function ForgeForm() {
   const [step, setStep] = useState<AppStep>('input');
@@ -295,6 +296,10 @@ export default function ForgeForm() {
       </div>
 
       <DownloadArea zipUrl={zipUrl} elements={elements} scriptText={scriptText} timeline={timeline} />
+
+      {step === 'done' && timeline && timeline.length > 0 && (
+        <VideoOverlaySection timeline={timeline} />
+      )}
     </div>
   );
 }

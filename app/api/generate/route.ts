@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
         end_time: formatTimestamp(element.timestampEnd),
         width,
         height,
+        pngBase64: Buffer.from(buffer).toString('base64'),
       });
     }
 

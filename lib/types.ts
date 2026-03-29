@@ -46,6 +46,7 @@ export interface TimelineEntry {
   end_time: string | null;
   width: number;
   height: number;
+  pngBase64?: string;
 }
 
 export interface TimelineJson {
