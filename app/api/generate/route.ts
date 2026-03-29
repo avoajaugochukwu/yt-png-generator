@@ -60,6 +60,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const manifest = timelineEntries.map(({ pngBase64, ...rest }) => rest);
+    files.push({ name: 'manifest.json', buffer: Buffer.from(JSON.stringify(manifest, null, 2)) });
+
     const zipBuffer = await createZip(files);
 
     return Response.json({
