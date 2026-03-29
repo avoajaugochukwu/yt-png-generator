@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { transcribeAudio } from '@/lib/whisper-client';
+import { transcribeLargeAudio } from '@/lib/audio-chunker';
 
 export const maxDuration = 3600;
 
@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await transcribeAudio(audioFile);
+    const buffer = Buffer.from(await audioFile.arrayBuffer());
+    const result = await transcribeLargeAudio(buffer, audioFile.name, audioFile.type);
     return Response.json(result);
   } catch (error) {
     console.error('[/api/transcribe]', error);
