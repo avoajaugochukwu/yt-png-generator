@@ -17,6 +17,9 @@ const FONT_MAP: Record<string, string> = {
 };
 
 const PADDING = 40;
+const BAR_WIDTH = 12;
+const BAR_COLOR = '#60B5F6'; // light blue
+const HEADING_TYPES: Set<VisualElement['type']> = new Set(['main-title', 'listicle-heading']);
 
 interface SizeConfig {
   maxWidth: number;
@@ -83,6 +86,13 @@ export function generatePng(
   ctx.fillStyle = options.backgroundColor;
   ctx.fillRect(0, 0, config.maxWidth, canvasHeight);
 
+  // Left bar for headings
+  const hasBar = HEADING_TYPES.has(element.type);
+  if (hasBar) {
+    ctx.fillStyle = BAR_COLOR;
+    ctx.fillRect(0, 0, BAR_WIDTH, canvasHeight);
+  }
+
   // Text — uppercase, vertically centered
   const isCentered = element.type === 'main-title';
   ctx.fillStyle = options.textColor;
@@ -90,7 +100,8 @@ export function generatePng(
   ctx.textBaseline = 'middle';
   ctx.textAlign = isCentered ? 'center' : 'left';
 
-  const startX = isCentered ? config.maxWidth / 2 : PADDING;
+  const textLeftPad = hasBar ? PADDING + BAR_WIDTH : PADDING;
+  const startX = isCentered ? config.maxWidth / 2 : textLeftPad;
   const centerY = canvasHeight / 2;
   const firstLineY = centerY - ((lines.length - 1) * lineHeight) / 2;
 
