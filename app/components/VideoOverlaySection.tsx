@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { TimelineEntry } from '@/lib/types';
 
 interface VideoOverlaySectionProps {
@@ -8,7 +8,6 @@ interface VideoOverlaySectionProps {
 }
 
 function parseTimestamp(ts: string): number {
-  // Format: "HH:MM:SS.mmm"
   const parts = ts.split(':');
   const h = parseFloat(parts[0]);
   const m = parseFloat(parts[1]);
@@ -16,33 +15,82 @@ function parseTimestamp(ts: string): number {
   return h * 3600 + m * 60 + s;
 }
 
+const POLL_INTERVAL = 5000;
+
 export default function VideoOverlaySection({ timeline }: VideoOverlaySectionProps) {
   const [videoUrl, setVideoUrl] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState('');
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Check if any timeline entries have timestamps
   const hasTimestamps = timeline.some((e) => e.start_time && e.end_time);
 
-  // Cleanup blob URL on unmount
   useEffect(() => {
     return () => {
       if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+      if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [downloadUrl]);
 
   if (!hasTimestamps) return null;
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  async function pollJobStatus(jobId: string) {
+    try {
+      const res = await fetch(`/api/overlay?jobId=${jobId}&action=status`);
+      if (!res.ok) {
+        stopPolling();
+        setError('Failed to check job status');
+        setIsProcessing(false);
+        return;
+      }
+
+      const data = await res.json();
+
+      if (data.status === 'done') {
+        stopPolling();
+        setStatus('Downloading result...');
+
+        const downloadRes = await fetch(`/api/overlay?jobId=${jobId}&action=download`);
+        if (!downloadRes.ok) {
+          throw new Error('Failed to download result');
+        }
+
+        const blob = await downloadRes.blob();
+        const url = URL.createObjectURL(blob);
+        setDownloadUrl(url);
+        setStatus('');
+        setIsProcessing(false);
+      } else if (data.status === 'error') {
+        stopPolling();
+        setError(data.error || 'Processing failed');
+        setStatus('');
+        setIsProcessing(false);
+      }
+      // else still processing — keep polling
+    } catch (err) {
+      stopPolling();
+      setError(err instanceof Error ? err.message : 'Failed to check job status');
+      setStatus('');
+      setIsProcessing(false);
+    }
+  }
 
   async function handleOverlay() {
     if (!videoUrl.trim()) return;
 
     setError('');
     setIsProcessing(true);
-    setStatus('Downloading video and applying overlays...');
+    setStatus('Starting overlay processing...');
 
-    // Cleanup previous download
     if (downloadUrl) {
       URL.revokeObjectURL(downloadUrl);
       setDownloadUrl(null);
@@ -70,22 +118,18 @@ export default function VideoOverlaySection({ timeline }: VideoOverlaySectionPro
       });
 
       if (!res.ok) {
-        const contentType = res.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          const data = await res.json();
-          throw new Error(data.error || 'Overlay processing failed');
-        }
-        throw new Error(`Overlay processing failed (${res.status})`);
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to start overlay job');
       }
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setDownloadUrl(url);
-      setStatus('');
+      const { jobId } = await res.json();
+      setStatus('Processing video — this may take several minutes...');
+
+      // Start polling
+      pollRef.current = setInterval(() => pollJobStatus(jobId), POLL_INTERVAL);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Overlay processing failed');
       setStatus('');
-    } finally {
       setIsProcessing(false);
     }
   }

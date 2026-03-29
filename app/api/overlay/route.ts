@@ -2,16 +2,16 @@ import { NextRequest } from 'next/server';
 import { Readable } from 'stream';
 import * as fs from 'fs';
 import * as fsPromises from 'fs/promises';
-import { overlayPngsOnVideo, type OverlayInput } from '@/lib/video-overlay';
+import type { OverlayInput } from '@/lib/video-overlay';
+import { startOverlayJob, getJob, deleteJob } from '@/lib/overlay-jobs';
 
 interface OverlayRequestBody {
   videoUrl: string;
   overlays: OverlayInput[];
 }
 
+// POST: start a new overlay job
 export async function POST(request: NextRequest) {
-  let tempDir: string | null = null;
-
   try {
     const body: OverlayRequestBody = await request.json();
 
@@ -41,35 +41,62 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const result = await overlayPngsOnVideo(body.videoUrl, body.overlays);
-    tempDir = result.tempDir;
-
-    const stat = await fsPromises.stat(result.outputPath);
-    const fileStream = fs.createReadStream(result.outputPath);
-    const webStream = Readable.toWeb(fileStream) as ReadableStream;
-
-    // Schedule cleanup after stream is consumed
-    fileStream.on('close', () => {
-      if (tempDir) {
-        fsPromises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-      }
-    });
-
-    return new Response(webStream, {
-      headers: {
-        'Content-Type': 'video/mp4',
-        'Content-Disposition': 'attachment; filename="overlaid-video.mp4"',
-        'Content-Length': String(stat.size),
-      },
-    });
+    const jobId = startOverlayJob(body.videoUrl, body.overlays);
+    return Response.json({ jobId });
   } catch (error) {
-    // Clean up if we haven't set up streaming yet
-    if (tempDir) {
-      await fsPromises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-    }
-
-    console.error('[/api/overlay]', error);
-    const message = error instanceof Error ? error.message : 'Overlay processing failed';
+    console.error('[/api/overlay POST]', error);
+    const message = error instanceof Error ? error.message : 'Failed to start overlay job';
     return Response.json({ error: message }, { status: 500 });
   }
+}
+
+// GET: poll job status or download result
+export async function GET(request: NextRequest) {
+  const jobId = request.nextUrl.searchParams.get('jobId');
+  const action = request.nextUrl.searchParams.get('action'); // 'status' or 'download'
+
+  if (!jobId) {
+    return Response.json({ error: 'jobId is required' }, { status: 400 });
+  }
+
+  const job = getJob(jobId);
+  if (!job) {
+    return Response.json({ error: 'Job not found' }, { status: 404 });
+  }
+
+  if (action === 'download') {
+    if (job.status !== 'done' || !job.outputPath) {
+      return Response.json({ error: 'Job is not ready for download' }, { status: 400 });
+    }
+
+    try {
+      const stat = await fsPromises.stat(job.outputPath);
+      const fileStream = fs.createReadStream(job.outputPath);
+      const webStream = Readable.toWeb(fileStream) as ReadableStream;
+
+      // Cleanup after stream is consumed
+      fileStream.on('close', () => {
+        deleteJob(jobId);
+      });
+
+      return new Response(webStream, {
+        headers: {
+          'Content-Type': 'video/mp4',
+          'Content-Disposition': 'attachment; filename="overlaid-video.mp4"',
+          'Content-Length': String(stat.size),
+        },
+      });
+    } catch (error) {
+      console.error('[/api/overlay GET download]', error);
+      deleteJob(jobId);
+      return Response.json({ error: 'Failed to read output file' }, { status: 500 });
+    }
+  }
+
+  // Default: return status
+  return Response.json({
+    jobId: job.id,
+    status: job.status,
+    error: job.error,
+  });
 }
