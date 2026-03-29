@@ -17,9 +17,12 @@ import InputSection from './InputSection';
 import CustomizationPanel from './CustomizationPanel';
 import GenerateButton from './GenerateButton';
 import DownloadArea from './DownloadArea';
+import VideoOverlaySection from './VideoOverlaySection';
+
 export default function ForgeForm() {
   const [step, setStep] = useState<AppStep>('input');
   const [scriptText, setScriptText] = useState('');
+  const [audioFile, setAudioFile] = useState<File | null>(null);
   const [elements, setElements] = useState<VisualElement[] | null>(null);
   const [customization, setCustomization] = useState<CustomizationOptions>({
     textColor: '#000000',
@@ -84,12 +87,37 @@ export default function ForgeForm() {
     setStep('analyzing');
 
     try {
+      let script = scriptText;
+      let segments;
+
+      // Transcribe audio first if provided and no script text
+      if (audioFile && !script.trim()) {
+        const formData = new FormData();
+        formData.append('audio', audioFile);
+
+        const transcribeRes = await fetch('/api/transcribe', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!transcribeRes.ok) {
+          const data = await transcribeRes.json();
+          throw new Error(data.error || 'Transcription failed');
+        }
+
+        const transcription = await transcribeRes.json();
+        script = transcription.fullText;
+        segments = transcription.segments;
+        setScriptText(script);
+      }
+
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          script: scriptText,
+          script,
           customInstructions: customInstructions || undefined,
+          segments: segments || undefined,
         }),
       });
 
@@ -107,7 +135,7 @@ export default function ForgeForm() {
     } finally {
       setIsLoading(false);
     }
-  }, [scriptText, customInstructions]);
+  }, [scriptText, customInstructions, audioFile]);
 
   const handleGenerate = useCallback(async () => {
     if (!elements) return;
@@ -162,6 +190,7 @@ export default function ForgeForm() {
     if (zipUrl) URL.revokeObjectURL(zipUrl);
     setStep('input');
     setScriptText('');
+    setAudioFile(null);
     setElements(null);
     setZipUrl(null);
     setZipBase64(null);
@@ -200,6 +229,8 @@ export default function ForgeForm() {
       <InputSection
         scriptText={scriptText}
         onScriptChange={setScriptText}
+        audioFile={audioFile}
+        onAudioFileChange={setAudioFile}
         isLoading={isLoading}
       />
 
@@ -246,7 +277,7 @@ export default function ForgeForm() {
       <div className="flex items-center gap-3">
         <GenerateButton
           step={step}
-          hasScript={scriptText.trim().length > 0}
+          hasScript={scriptText.trim().length > 0 || !!audioFile}
           hasElements={!!elements?.length}
           isLoading={isLoading}
           onAnalyze={handleAnalyze}
@@ -265,6 +296,10 @@ export default function ForgeForm() {
       </div>
 
       <DownloadArea zipUrl={zipUrl} elements={elements} scriptText={scriptText} timeline={timeline} />
+
+      {step === 'done' && timeline && timeline.length > 0 && (
+        <VideoOverlaySection timeline={timeline} />
+      )}
     </div>
   );
 }

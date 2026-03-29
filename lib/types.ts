@@ -1,3 +1,14 @@
+export interface TranscriptSegment {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface TranscribeResponse {
+  segments: TranscriptSegment[];
+  fullText: string;
+}
+
 export interface VisualElement {
   id: string;
   type: 'main-title' | 'listicle-heading' | 'point-of-interest';
@@ -9,6 +20,7 @@ export interface VisualElement {
 export interface AnalyzeRequest {
   script: string;
   customInstructions?: string;
+  segments?: TranscriptSegment[];
 }
 
 export interface AnalyzeResponse {
