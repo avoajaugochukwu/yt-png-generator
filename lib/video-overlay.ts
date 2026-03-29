@@ -67,8 +67,6 @@ async function downloadVideo(url: string, destPath: string): Promise<void> {
   }
 }
 
-const BATCH_SIZE = 10;
-
 interface PositionedOverlay {
   pngPath: string;
   x: number;
@@ -85,51 +83,18 @@ function buildFilterComplex(
 
   for (let i = 0; i < overlays.length; i++) {
     const o = overlays[i];
+    const fmtLabel = `ov${i}`;
     const outLabel = i === overlays.length - 1 ? 'out' : `v${i}`;
+    // Explicitly convert PNG from rgba to yuva420p to prevent ffmpeg from
+    // inserting auto_scale filters which exhaust resources when chained.
+    filters.push(`[${o.inputIndex}:v]format=yuva420p[${fmtLabel}]`);
     filters.push(
-      `[${prevLabel}][${o.inputIndex}:v]overlay=${o.x}:${o.y}:enable='between(t,${o.start},${o.end})'[${outLabel}]`
+      `[${prevLabel}][${fmtLabel}]overlay=${o.x}:${o.y}:enable='between(t,${o.start},${o.end})'[${outLabel}]`
     );
     prevLabel = outLabel;
   }
 
   return filters.join(';');
-}
-
-async function runOverlayPass(
-  inputPath: string,
-  outputPath: string,
-  batch: PositionedOverlay[],
-  copyAudio: boolean,
-): Promise<void> {
-  const filterOverlays = batch.map((o, i) => ({
-    inputIndex: i + 1,
-    x: o.x,
-    y: o.y,
-    start: o.start,
-    end: o.end,
-  }));
-
-  const filterComplex = buildFilterComplex(filterOverlays);
-
-  // Write filter to a script file to avoid command-line length limits
-  const scriptPath = outputPath + '.filter';
-  await fs.writeFile(scriptPath, filterComplex);
-
-  const args = [
-    '-i', inputPath,
-    ...batch.flatMap(o => ['-i', o.pngPath]),
-    '-filter_complex_script', scriptPath,
-    '-map', '[out]',
-    ...(copyAudio ? ['-map', '0:a?', '-c:a', 'copy'] : ['-an']),
-    '-c:v', 'libx264',
-    '-preset', 'fast',
-    '-crf', '23',
-    '-movflags', '+faststart',
-    '-y',
-    outputPath,
-  ];
-
-  await execFile(FFMPEG, args, { timeout: 600_000, maxBuffer: 10 * 1024 * 1024 });
 }
 
 export async function overlayPngsOnVideo(
@@ -147,43 +112,52 @@ export async function overlayPngsOnVideo(
     const video = await getVideoDimensions(videoPath);
 
     // Write PNG files and compute overlay positions
-    const positioned: PositionedOverlay[] = [];
+    const pngPaths: string[] = [];
+    const filterOverlays: Array<{ inputIndex: number; x: number; y: number; start: number; end: number }> = [];
 
     for (let i = 0; i < overlays.length; i++) {
       const o = overlays[i];
       const pngPath = path.join(tempDir, `overlay_${i}.png`);
       await fs.writeFile(pngPath, Buffer.from(o.pngBase64, 'base64'));
+      pngPaths.push(pngPath);
 
       const x = Math.max(0, Math.round((video.width - o.width) / 2));
       const y = Math.max(0, Math.round((video.height - o.height) / 2));
 
-      positioned.push({ pngPath, x, y, start: o.startTime, end: o.endTime });
+      filterOverlays.push({
+        inputIndex: i + 1,
+        x,
+        y,
+        start: o.startTime,
+        end: o.endTime,
+      });
     }
 
-    // Process in batches to avoid ffmpeg resource exhaustion
-    const batches: PositionedOverlay[][] = [];
-    for (let i = 0; i < positioned.length; i += BATCH_SIZE) {
-      batches.push(positioned.slice(i, i + BATCH_SIZE));
-    }
+    const filterComplex = buildFilterComplex(filterOverlays);
+    const outputPath = path.join(tempDir, 'output.mp4');
 
-    let currentInput = videoPath;
+    // Write filter to a script file to avoid command-line length limits
+    const scriptPath = path.join(tempDir, 'filter.txt');
+    await fs.writeFile(scriptPath, filterComplex);
 
-    for (let b = 0; b < batches.length; b++) {
-      const isLast = b === batches.length - 1;
-      const outputPath = path.join(tempDir, isLast ? 'output.mp4' : `pass_${b}.mp4`);
+    const args = [
+      '-i', videoPath,
+      ...pngPaths.flatMap(p => ['-i', p]),
+      '-filter_complex_script', scriptPath,
+      '-map', '[out]',
+      '-map', '0:a?',
+      '-c:a', 'copy',
+      '-c:v', 'libx264',
+      '-preset', 'fast',
+      '-crf', '23',
+      '-movflags', '+faststart',
+      '-y',
+      outputPath,
+    ];
 
-      // Only copy audio on the last pass to avoid re-muxing every time
-      await runOverlayPass(currentInput, outputPath, batches[b], isLast);
+    await execFile(FFMPEG, args, { timeout: 600_000, maxBuffer: 10 * 1024 * 1024 });
 
-      // Clean up intermediate files
-      if (b > 0) {
-        await fs.unlink(currentInput).catch(() => {});
-      }
-
-      currentInput = outputPath;
-    }
-
-    return { outputPath: path.join(tempDir, 'output.mp4'), tempDir };
+    return { outputPath, tempDir };
   } catch (err) {
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
     throw err;
