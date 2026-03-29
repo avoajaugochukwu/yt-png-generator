@@ -1,9 +1,7 @@
 import { NextRequest } from 'next/server';
-import openai from '@/lib/openai';
-import { transcribeLargeAudio } from '@/lib/audio-chunker';
-import type { TranscribeResponse } from '@/lib/types';
+import { transcribeAudio } from '@/lib/whisper-client';
 
-export const maxDuration = 300;
+export const maxDuration = 3600;
 
 const ALLOWED_TYPES = new Set([
   'audio/mpeg',
@@ -13,8 +11,6 @@ const ALLOWED_TYPES = new Set([
   'audio/x-m4a',
   'audio/m4a',
 ]);
-
-const CHUNK_THRESHOLD = 25 * 1024 * 1024; // 25MB
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,33 +28,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (audioFile.size > CHUNK_THRESHOLD) {
-      const buffer = Buffer.from(await audioFile.arrayBuffer());
-      const result = await transcribeLargeAudio(buffer, audioFile.name, audioFile.type);
-      return Response.json(result);
-    }
-
-    const transcription = await openai.audio.transcriptions.create({
-      file: audioFile,
-      model: 'whisper-1',
-      response_format: 'verbose_json',
-      timestamp_granularities: ['segment'],
-    });
-
-    const segments = (transcription.segments || []).map((seg) => ({
-      start: seg.start,
-      end: seg.end,
-      text: seg.text.trim(),
-    }));
-
-    const result: TranscribeResponse = {
-      segments,
-      fullText: transcription.text,
-    };
-
+    const result = await transcribeAudio(audioFile);
     return Response.json(result);
   } catch (error) {
     console.error('[/api/transcribe]', error);
-    return Response.json({ error: 'Transcription failed' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Transcription failed';
+    return Response.json({ error: message }, { status: 500 });
   }
 }
