@@ -44,6 +44,7 @@ export interface TimelineEntry {
   type: VisualElement['type'];
   start_time: string | null;
   end_time: string | null;
+  position: string;
   width: number;
   height: number;
   pngBase64?: string;

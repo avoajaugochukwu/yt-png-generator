@@ -54,13 +54,14 @@ export async function POST(request: NextRequest) {
         type: element.type,
         start_time: formatTimestamp(element.timestamp),
         end_time: formatTimestamp(element.timestampEnd),
+        position: element.type === 'main-title' ? 'center' : 'bottom-left',
         width,
         height,
         pngBase64: Buffer.from(buffer).toString('base64'),
       });
     }
 
-    const manifest = timelineEntries.map(({ pngBase64, ...rest }) => rest);
+    const manifest = timelineEntries.map(({ pngBase64, width, height, ...rest }) => rest);
     files.push({ name: 'manifest.json', buffer: Buffer.from(JSON.stringify(manifest, null, 2)) });
 
     const zipBuffer = await createZip(files);
