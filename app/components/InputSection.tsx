@@ -3,16 +3,12 @@
 interface InputSectionProps {
   scriptText: string;
   onScriptChange: (text: string) => void;
-  audioFile: File | null;
-  onAudioFileChange: (file: File | null) => void;
   isLoading: boolean;
 }
 
 export default function InputSection({
   scriptText,
   onScriptChange,
-  audioFile,
-  onAudioFileChange,
   isLoading,
 }: InputSectionProps) {
   async function handleScriptFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -20,11 +16,6 @@ export default function InputSection({
     if (!file) return;
     const text = await file.text();
     onScriptChange(text);
-  }
-
-  function handleAudioFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    onAudioFileChange(file);
   }
 
   return (
@@ -42,37 +33,17 @@ export default function InputSection({
         />
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1">
-          <label className="block text-sm font-medium mb-1.5">
-            Or upload a script file (.txt)
-          </label>
-          <input
-            type="file"
-            accept=".txt"
-            onChange={handleScriptFile}
-            disabled={isLoading}
-            className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700 file:cursor-pointer"
-          />
-        </div>
-
-        <div className="flex-1">
-          <label className="block text-sm font-medium mb-1.5">
-            Or upload audio for transcription
-          </label>
-          <input
-            type="file"
-            accept=".mp3,.wav,.m4a"
-            onChange={handleAudioFile}
-            disabled={isLoading}
-            className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700 file:cursor-pointer"
-          />
-          {audioFile && (
-            <p className="mt-1.5 text-sm text-neutral-500">
-              Selected: {audioFile.name}
-            </p>
-          )}
-        </div>
+      <div>
+        <label className="block text-sm font-medium mb-1.5">
+          Or upload a script file (.txt)
+        </label>
+        <input
+          type="file"
+          accept=".txt"
+          onChange={handleScriptFile}
+          disabled={isLoading}
+          className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700 file:cursor-pointer"
+        />
       </div>
     </div>
   );

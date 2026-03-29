@@ -19,8 +19,9 @@ Rules:
 - The main-title should be a concise summary (2-5 words) of the overall video topic.
 - Listicle heading text should be short: "#N" followed by the item name (2-5 words max).
 - Points of interest should be brief phrases (2-6 words).
-- If timestamped segments are provided, match each element to the closest segment's start/end times (in seconds).
-- If no timestamps are available, set timestamp and timestampEnd to null.
+- The main-title should always have timestamp 0 and timestampEnd 10 (it appears at the start of the video).
+- No other element may have a timestamp that falls within 10 seconds of the main-title's timestampEnd. The earliest any other element can start is 20 seconds.
+- All other elements should have timestamp and timestampEnd set to null.
 - Generate a unique id for each element (use format "el-01", "el-02", etc.).
 - Order elements chronologically as they appear in the script.
 
@@ -31,22 +32,22 @@ Return JSON in this exact format:
       "id": "el-01",
       "type": "main-title",
       "text": "10 LUXURY PLANTS",
-      "timestamp": null,
-      "timestampEnd": null
+      "timestamp": 0,
+      "timestampEnd": 10
     },
     {
       "id": "el-02",
       "type": "listicle-heading",
       "text": "#1 CURRY LEAF TREE",
-      "timestamp": 15.2,
-      "timestampEnd": 18.5
+      "timestamp": null,
+      "timestampEnd": null
     },
     {
       "id": "el-03",
       "type": "point-of-interest",
       "text": "Peak oil content at dawn",
-      "timestamp": 22.0,
-      "timestampEnd": 24.5
+      "timestamp": null,
+      "timestampEnd": null
     }
   ]
 }`;
@@ -60,11 +61,6 @@ export async function POST(request: NextRequest) {
     }
 
     let userMessage = `Here is the video script to analyze:\n\n${body.script}`;
-
-    if (body.segments?.length) {
-      userMessage += '\n\nTimestamped segments from audio transcription:\n';
-      userMessage += JSON.stringify(body.segments, null, 2);
-    }
 
     if (body.customInstructions?.trim()) {
       userMessage += `\n\nAdditional instructions from the user:\n${body.customInstructions}`;
