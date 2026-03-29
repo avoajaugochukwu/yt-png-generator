@@ -20,20 +20,6 @@ function deriveSlug(script: string): string {
     .slice(0, 50) || 'video-assets';
 }
 
-function downloadManifest(timeline: TimelineEntry[], slug: string) {
-  const manifest = {
-    generatedAt: new Date().toISOString(),
-    entries: timeline,
-  };
-  const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${slug}-manifest.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 export default function DownloadArea({ zipUrl, elements, scriptText, timeline }: DownloadAreaProps) {
   if (!zipUrl || !elements) return null;
 
@@ -58,15 +44,6 @@ export default function DownloadArea({ zipUrl, elements, scriptText, timeline }:
             Download ZIP
           </a>
 
-          {timeline && timeline.length > 0 && (
-            <button
-              type="button"
-              onClick={() => downloadManifest(timeline, slug)}
-              className="inline-block rounded-lg bg-neutral-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-neutral-700 transition-colors"
-            >
-              Download Manifest
-            </button>
-          )}
         </div>
       </div>
 
