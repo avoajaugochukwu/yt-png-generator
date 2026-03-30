@@ -13,6 +13,37 @@ interface CustomizationPanelProps {
   previewElement: VisualElement | null;
 }
 
+function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-xs font-medium text-muted">{label}</label>
+      <div className="flex items-center gap-2 rounded-lg border border-card-border bg-surface px-2 py-1.5 focus-within:ring-2 focus-within:ring-accent/40 focus-within:border-accent transition-shadow">
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-7 w-7 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch]:shadow-[inset_0_0_0_1px_rgba(0,0,0,0.15)]"
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full bg-transparent text-sm font-mono text-foreground outline-none placeholder:text-muted-light"
+          placeholder="#000000"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function CustomizationPanel({
   customization,
   onCustomizationChange,
@@ -60,75 +91,39 @@ export default function CustomizationPanel({
   }, [previewElement, customization]);
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-        Customization
-      </h3>
-
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1.5">Text Color</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={customization.textColor}
-              onChange={(e) => update('textColor', e.target.value)}
-              className="h-9 w-12 rounded border border-neutral-300 dark:border-neutral-700 cursor-pointer"
-            />
-            <input
-              type="text"
-              value={customization.textColor}
-              onChange={(e) => update('textColor', e.target.value)}
-              className="flex-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm font-mono"
-              placeholder="#ffffff"
-            />
-          </div>
+    <div className="rounded-xl border border-card-border bg-card p-5 space-y-5">
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-light">
+          <svg className="h-3.5 w-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+          </svg>
         </div>
+        <h3 className="text-sm font-semibold text-foreground">Customization</h3>
+      </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1.5">Background Color</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={customization.backgroundColor}
-              onChange={(e) => update('backgroundColor', e.target.value)}
-              className="h-9 w-12 rounded border border-neutral-300 dark:border-neutral-700 cursor-pointer"
-            />
-            <input
-              type="text"
-              value={customization.backgroundColor}
-              onChange={(e) => update('backgroundColor', e.target.value)}
-              className="flex-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm font-mono"
-              placeholder="#1a1a2e"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1.5">Bar Color</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={customization.barColor}
-              onChange={(e) => update('barColor', e.target.value)}
-              className="h-9 w-12 rounded border border-neutral-300 dark:border-neutral-700 cursor-pointer"
-            />
-            <input
-              type="text"
-              value={customization.barColor}
-              onChange={(e) => update('barColor', e.target.value)}
-              className="flex-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm font-mono"
-              placeholder="#60B5F6"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1.5">Font</label>
+      {/* Color & font controls */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <ColorField
+          label="Text Color"
+          value={customization.textColor}
+          onChange={(v) => update('textColor', v)}
+        />
+        <ColorField
+          label="Background"
+          value={customization.backgroundColor}
+          onChange={(v) => update('backgroundColor', v)}
+        />
+        <ColorField
+          label="Bar Color"
+          value={customization.barColor}
+          onChange={(v) => update('barColor', v)}
+        />
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-muted">Font</label>
           <select
             value={customization.fontFamily}
             onChange={(e) => update('fontFamily', e.target.value)}
-            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-card-border bg-surface px-3 py-[9px] text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-shadow"
           >
             {AVAILABLE_FONTS.map((font) => (
               <option key={font} value={font}>
@@ -139,28 +134,30 @@ export default function CustomizationPanel({
         </div>
       </div>
 
+      {/* Live preview */}
       {previewSrc && (
-        <div className="space-y-1.5">
-          <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden bg-neutral-100 dark:bg-neutral-900 p-2">
+        <div className="animate-fade-in space-y-2">
+          <div className="rounded-xl border border-card-border overflow-hidden bg-surface p-3">
             <img
               src={previewSrc}
               alt="Preview"
-              className="w-full h-auto rounded"
+              className="w-full h-auto rounded-lg"
             />
           </div>
-          <p className="text-xs text-neutral-400 dark:text-neutral-500">
+          <p className="text-[11px] text-muted-light">
             Preview does not include the title, which is always white.
           </p>
         </div>
       )}
 
+      {/* Custom instructions */}
       <div>
-        <label className="block text-sm font-medium mb-1.5">
+        <label className="block text-xs font-medium text-muted mb-1.5">
           Custom Instructions (optional)
         </label>
         <textarea
-          className="w-full h-20 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
-          placeholder='e.g., "make all product names red", "use a larger font for headings", "focus on statistics"'
+          className="w-full h-20 rounded-xl border border-card-border bg-surface px-4 py-3 text-sm text-foreground placeholder:text-muted-light focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent resize-y transition-shadow"
+          placeholder='e.g., "make all product names red", "use a larger font for headings"'
           value={customInstructions}
           onChange={(e) => onCustomInstructionsChange(e.target.value)}
         />

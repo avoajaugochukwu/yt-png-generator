@@ -17,6 +17,15 @@ function parseTimestamp(ts: string): number {
 
 const POLL_INTERVAL = 5000;
 
+function Spinner() {
+  return (
+    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  );
+}
+
 export default function VideoOverlaySection({ timeline }: VideoOverlaySectionProps) {
   const [videoUrl, setVideoUrl] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -75,7 +84,6 @@ export default function VideoOverlaySection({ timeline }: VideoOverlaySectionPro
         setStatus('');
         setIsProcessing(false);
       }
-      // else still processing — keep polling
     } catch (err) {
       stopPolling();
       setError(err instanceof Error ? err.message : 'Failed to check job status');
@@ -125,7 +133,6 @@ export default function VideoOverlaySection({ timeline }: VideoOverlaySectionPro
       const { jobId } = await res.json();
       setStatus('Processing video — this may take several minutes...');
 
-      // Start polling
       pollRef.current = setInterval(() => pollJobStatus(jobId), POLL_INTERVAL);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Overlay processing failed');
@@ -135,13 +142,22 @@ export default function VideoOverlaySection({ timeline }: VideoOverlaySectionPro
   }
 
   return (
-    <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-5 space-y-4">
-      <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-200">
-        Apply Overlays to Video
-      </h3>
-      <p className="text-sm text-neutral-500 dark:text-neutral-400">
-        Paste a direct video file URL to overlay the generated PNGs at their timeline positions.
-      </p>
+    <div className="animate-fade-in rounded-xl border border-card-border bg-card p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-light">
+          <svg className="h-3.5 w-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">
+            Apply Overlays to Video
+          </h3>
+          <p className="text-xs text-muted-light">
+            Paste a direct video file URL to overlay PNGs at their timeline positions
+          </p>
+        </div>
+      </div>
 
       <div className="flex gap-3">
         <input
@@ -150,51 +166,78 @@ export default function VideoOverlaySection({ timeline }: VideoOverlaySectionPro
           onChange={(e) => setVideoUrl(e.target.value)}
           placeholder="https://example.com/video.mp4"
           disabled={isProcessing}
-          className="flex-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-2.5 text-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          className="flex-1 rounded-xl border border-card-border bg-surface px-4 py-2.5 text-sm text-foreground placeholder:text-muted-light focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent disabled:opacity-50 transition-shadow"
         />
         <button
           onClick={handleOverlay}
           disabled={isProcessing || !videoUrl.trim()}
-          className="shrink-0 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="shrink-0 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-accent/20 hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all"
         >
-          {isProcessing && (
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
+          {isProcessing ? (
+            <>
+              <Spinner />
+              Processing...
+            </>
+          ) : (
+            <>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Apply Overlays
+            </>
           )}
-          {isProcessing ? 'Processing...' : 'Apply Overlays'}
         </button>
       </div>
 
       {status && (
-        <p className="text-sm text-blue-600 dark:text-blue-400">{status}</p>
+        <div className="flex items-center gap-2 rounded-lg bg-accent-light px-4 py-2.5">
+          <Spinner />
+          <p className="text-sm text-accent">{status}</p>
+        </div>
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950 px-4 py-3 text-sm text-red-700 dark:text-red-300 flex items-center justify-between">
-          <span>{error}</span>
+        <div className="animate-slide-down flex items-center gap-3 rounded-xl border border-danger/20 bg-danger-light px-4 py-3">
+          <svg className="h-4 w-4 shrink-0 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+          <p className="flex-1 text-sm text-danger">{error}</p>
           <button
             onClick={() => setError('')}
-            className="ml-3 text-red-500 hover:text-red-700 font-medium"
+            className="shrink-0 rounded-lg p-1 text-danger/60 hover:text-danger hover:bg-danger/10 transition-colors"
           >
-            Dismiss
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
       )}
 
       {downloadUrl && (
-        <div className="rounded-lg border border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-950 p-4">
-          <p className="text-sm text-green-700 dark:text-green-300 mb-3">
-            Video ready with overlays applied.
-          </p>
-          <a
-            href={downloadUrl}
-            download="overlaid-video.mp4"
-            className="inline-block rounded-lg bg-green-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition-colors"
-          >
-            Download Video
-          </a>
+        <div className="rounded-xl border border-success/20 bg-success-light p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success/10">
+              <svg className="h-4 w-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-success">
+                Video ready with overlays applied.
+              </p>
+              <a
+                href={downloadUrl}
+                download="overlaid-video.mp4"
+                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-success px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-success/20 hover:bg-success-hover hover:shadow-lg hover:shadow-success/30 active:scale-[0.98] transition-all"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download Video
+              </a>
+            </div>
+          </div>
         </div>
       )}
     </div>
