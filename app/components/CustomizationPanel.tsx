@@ -27,7 +27,7 @@ export default function CustomizationPanel({
         Customization
       </h3>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div>
           <label className="block text-sm font-medium mb-1.5">Text Color</label>
           <div className="flex items-center gap-2">
@@ -62,6 +62,25 @@ export default function CustomizationPanel({
               onChange={(e) => update('backgroundColor', e.target.value)}
               className="flex-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm font-mono"
               placeholder="#1a1a2e"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1.5">Bar Color</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={customization.barColor}
+              onChange={(e) => update('barColor', e.target.value)}
+              className="h-9 w-12 rounded border border-neutral-300 dark:border-neutral-700 cursor-pointer"
+            />
+            <input
+              type="text"
+              value={customization.barColor}
+              onChange={(e) => update('barColor', e.target.value)}
+              className="flex-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm font-mono"
+              placeholder="#60B5F6"
             />
           </div>
         </div>

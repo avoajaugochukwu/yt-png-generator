@@ -18,7 +18,7 @@ const FONT_MAP: Record<string, string> = {
 
 const PADDING = 40;
 const BAR_WIDTH = 12;
-const BAR_COLOR = '#60B5F6'; // light blue
+const DEFAULT_BAR_COLOR = '#60B5F6'; // light blue
 const HEADING_TYPES: Set<VisualElement['type']> = new Set(['main-title', 'listicle-heading']);
 
 interface SizeConfig {
@@ -89,7 +89,7 @@ export function generatePng(
   // Left bar for headings
   const hasBar = HEADING_TYPES.has(element.type);
   if (hasBar) {
-    ctx.fillStyle = BAR_COLOR;
+    ctx.fillStyle = options.barColor || DEFAULT_BAR_COLOR;
     ctx.fillRect(0, 0, BAR_WIDTH, canvasHeight);
   }
 

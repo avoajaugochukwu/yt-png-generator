@@ -11,6 +11,7 @@ export interface CurrentSession {
   customization: {
     textColor: string;
     backgroundColor: string;
+    barColor: string;
     fontFamily: string;
   };
   customInstructions: string;

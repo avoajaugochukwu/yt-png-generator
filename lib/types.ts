@@ -30,6 +30,7 @@ export interface AnalyzeResponse {
 export interface CustomizationOptions {
   textColor: string;
   backgroundColor: string;
+  barColor: string;
   fontFamily: string;
 }
 

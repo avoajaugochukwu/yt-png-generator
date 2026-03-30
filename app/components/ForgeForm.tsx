@@ -27,6 +27,7 @@ export default function ForgeForm() {
   const [customization, setCustomization] = useState<CustomizationOptions>({
     textColor: '#000000',
     backgroundColor: '#ffffff',
+    barColor: '#60B5F6',
     fontFamily: 'Anton',
   });
   const [customInstructions, setCustomInstructions] = useState('');
