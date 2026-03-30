@@ -47,58 +47,43 @@ export default function DownloadArea({ zipUrl, elements, scriptText, timeline }:
         </div>
       </div>
 
-      {timeline && timeline.length > 0 && (
-        <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 overflow-hidden">
-          <h3 className="px-4 py-3 text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800">
-            Timeline
-          </h3>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-neutral-200 dark:border-neutral-800 text-left text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                <th className="px-4 py-2">File</th>
-                <th className="px-4 py-2">Text</th>
-                <th className="px-4 py-2">Type</th>
-                <th className="px-4 py-2">Start</th>
-                <th className="px-4 py-2">End</th>
-              </tr>
-            </thead>
-            <tbody>
-              {timeline.map((entry) => (
-                <tr
-                  key={entry.filename}
-                  className="border-b border-neutral-100 dark:border-neutral-800 last:border-0"
+      {timeline && timeline.length > 0 && (() => {
+        const preview = timeline.find((e) => e.pngBase64 && e.type !== 'main-title') || timeline.find((e) => e.pngBase64);
+        if (!preview) return null;
+        return (
+          <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 overflow-hidden">
+            <h3 className="px-4 py-3 text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800">
+              Preview
+            </h3>
+            <div className="p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm">
+                <span
+                  className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${
+                    preview.type === 'main-title'
+                      ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
+                      : preview.type === 'listicle-heading'
+                        ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                        : 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300'
+                  }`}
                 >
-                  <td className="px-4 py-2 font-mono text-xs text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
-                    {entry.filename}
-                  </td>
-                  <td className="px-4 py-2 text-neutral-700 dark:text-neutral-300 whitespace-nowrap">
-                    {entry.text}
-                  </td>
-                  <td className="px-4 py-2">
-                    <span
-                      className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${
-                        entry.type === 'main-title'
-                          ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
-                          : entry.type === 'listicle-heading'
-                            ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                            : 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300'
-                      }`}
-                    >
-                      {entry.type === 'main-title' ? 'Title' : entry.type === 'listicle-heading' ? 'Heading' : 'POI'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 font-mono text-xs text-neutral-500 whitespace-nowrap">
-                    {entry.start_time ?? '—'}
-                  </td>
-                  <td className="px-4 py-2 font-mono text-xs text-neutral-500 whitespace-nowrap">
-                    {entry.end_time ?? '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                  {preview.type === 'main-title' ? 'Title' : preview.type === 'listicle-heading' ? 'Heading' : 'POI'}
+                </span>
+                <span className="font-mono text-xs text-neutral-500 dark:text-neutral-400">
+                  {preview.filename}
+                </span>
+              </div>
+              <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden bg-neutral-100 dark:bg-neutral-900 p-2">
+                <img
+                  src={`data:image/png;base64,${preview.pngBase64}`}
+                  alt={preview.text}
+                  className="w-full h-auto rounded"
+                  style={{ imageRendering: 'auto' }}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

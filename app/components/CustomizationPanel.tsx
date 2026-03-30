@@ -1,6 +1,7 @@
 'use client';
 
-import type { CustomizationOptions } from '@/lib/types';
+import { useState, useEffect, useRef } from 'react';
+import type { CustomizationOptions, VisualElement } from '@/lib/types';
 
 const AVAILABLE_FONTS = ['Anton', 'Inter', 'Merriweather', 'JetBrains Mono'] as const;
 
@@ -9,6 +10,7 @@ interface CustomizationPanelProps {
   onCustomizationChange: (options: CustomizationOptions) => void;
   customInstructions: string;
   onCustomInstructionsChange: (instructions: string) => void;
+  previewElement: VisualElement | null;
 }
 
 export default function CustomizationPanel({
@@ -16,10 +18,46 @@ export default function CustomizationPanel({
   onCustomizationChange,
   customInstructions,
   onCustomInstructionsChange,
+  previewElement,
 }: CustomizationPanelProps) {
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
   function update(key: keyof CustomizationOptions, value: string) {
     onCustomizationChange({ ...customization, [key]: value });
   }
+
+  useEffect(() => {
+    if (!previewElement) {
+      setPreviewSrc(null);
+      return;
+    }
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ element: previewElement, customization }),
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setPreviewSrc(`data:image/png;base64,${data.png}`);
+      } catch {
+        // aborted or failed — ignore
+      }
+    }, 150);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [previewElement, customization]);
 
   return (
     <div className="space-y-4">
@@ -100,6 +138,21 @@ export default function CustomizationPanel({
           </select>
         </div>
       </div>
+
+      {previewSrc && (
+        <div className="space-y-1.5">
+          <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden bg-neutral-100 dark:bg-neutral-900 p-2">
+            <img
+              src={previewSrc}
+              alt="Preview"
+              className="w-full h-auto rounded"
+            />
+          </div>
+          <p className="text-xs text-neutral-400 dark:text-neutral-500">
+            Preview does not include the title, which is always white.
+          </p>
+        </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium mb-1.5">

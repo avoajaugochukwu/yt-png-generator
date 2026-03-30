@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type {
   AppStep,
   VisualElement,
@@ -187,6 +187,11 @@ export default function ForgeForm() {
     }
   }, [elements, customization, zipUrl]);
 
+  const previewElement = useMemo(() => {
+    if (!elements) return null;
+    return elements.find((e) => e.type !== 'main-title') || elements[0] || null;
+  }, [elements]);
+
   function handleReset() {
     if (zipUrl) URL.revokeObjectURL(zipUrl);
     setStep('input');
@@ -240,6 +245,7 @@ export default function ForgeForm() {
         onCustomizationChange={setCustomization}
         customInstructions={customInstructions}
         onCustomInstructionsChange={setCustomInstructions}
+        previewElement={previewElement}
       />
 
       {elements && (
