@@ -23,6 +23,7 @@ Rules:
 - If no timestamps are available, set timestamp and timestampEnd to null.
 - Generate a unique id for each element (use format "el-01", "el-02", etc.).
 - Order elements chronologically as they appear in the script.
+- Enforce a minimum 20-second gap between any two consecutive elements that have timestamps (e.g., a listicle-heading and its following point-of-interest must be at least 20s apart, and the same applies between consecutive points-of-interest). If the script places them closer together, push the later element's timestamp forward so the gap is at least 20 seconds — but never push it past the next listicle-heading's timestamp. A heading and its first POI must NEVER share the same timestamp.
 
 Return JSON in this exact format:
 {
@@ -89,6 +90,36 @@ export async function POST(request: NextRequest) {
 
     if (!Array.isArray(parsed.elements)) {
       return Response.json({ error: 'Invalid AI response format' }, { status: 500 });
+    }
+
+    // Enforce minimum 20s gap between consecutive timestamped elements.
+    // Headings anchor the timeline — never push a POI past the next heading.
+    const MIN_GAP = 20;
+    const nextHeadingAt: (number | null)[] = parsed.elements.map(() => null);
+    let upcoming: number | null = null;
+    for (let i = parsed.elements.length - 1; i >= 0; i--) {
+      nextHeadingAt[i] = upcoming;
+      const el = parsed.elements[i];
+      if (el.type === 'listicle-heading' && typeof el.timestamp === 'number') {
+        upcoming = el.timestamp;
+      }
+    }
+    let prev: number | null = null;
+    for (let i = 0; i < parsed.elements.length; i++) {
+      const el = parsed.elements[i];
+      if (typeof el.timestamp !== 'number') continue;
+      if (el.type === 'main-title') continue;
+      if (prev !== null && el.timestamp - prev < MIN_GAP) {
+        const desired = prev + MIN_GAP;
+        const ceiling = el.type === 'point-of-interest' && nextHeadingAt[i] !== null
+          ? nextHeadingAt[i]! - 0.1
+          : Infinity;
+        el.timestamp = Math.min(desired, ceiling);
+        if (typeof el.timestampEnd === 'number' && el.timestampEnd < el.timestamp) {
+          el.timestampEnd = el.timestamp + 2;
+        }
+      }
+      prev = el.timestamp;
     }
 
     return Response.json(parsed);

@@ -365,7 +365,7 @@ export default function ForgeForm() {
                 </span>
                 {el.timestamp != null && (
                   <span className="ml-auto shrink-0 font-mono text-xs text-muted-light tabular-nums">
-                    {el.timestamp.toFixed(1)}s
+                    {Math.floor(el.timestamp / 60)}:{(el.timestamp % 60).toFixed(1).padStart(4, '0')}
                   </span>
                 )}
               </div>
