@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         type: element.type,
         start_time: formatTimestamp(element.timestamp),
         end_time: formatTimestamp(element.timestampEnd),
-        position: element.type === 'main-title' || element.type === 'subscribe' ? 'center' : 'bottom-left',
+        position: element.type === 'main-title' ? 'center' : element.type === 'subscribe' ? 'bottom-right' : 'bottom-left',
         width,
         height,
         pngBase64: Buffer.from(buffer).toString('base64'),
