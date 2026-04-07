@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import type { GridTemplate, GridCellData } from '@/lib/types';
-import { OUTPUT_WIDTH, OUTPUT_HEIGHT, cellDimensions } from '@/lib/grid-templates';
+import { OUTPUT_WIDTH, OUTPUT_HEIGHT, cellRect } from '@/lib/grid-templates';
 
 interface GridCanvasProps {
   template: GridTemplate;
@@ -28,9 +28,8 @@ export default function GridCanvas({
   onRemoveImage,
 }: GridCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const imgCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
-
-  const { cellW, cellH } = cellDimensions(template, gap);
 
   // Draw grid on canvas
   const draw = useCallback(() => {
@@ -44,8 +43,7 @@ export default function GridCanvas({
     ctx.fillRect(0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT);
 
     for (const cell of cells) {
-      const x = gap + cell.col * (cellW + gap);
-      const y = gap + cell.row * (cellH + gap);
+      const r = cellRect(template, gap, cell.row, cell.col);
 
       if (cell.imageUrl) {
         const cached = imgCacheRef.current.get(cell.imageUrl);
@@ -53,22 +51,22 @@ export default function GridCanvas({
           ctx.save();
           if (borderRadius > 0) {
             ctx.beginPath();
-            ctx.roundRect(x, y, cellW, cellH, borderRadius);
+            ctx.roundRect(r.x, r.y, r.w, r.h, borderRadius);
             ctx.clip();
           }
 
           const imgAspect = cached.naturalWidth / cached.naturalHeight;
-          const cellAspect = cellW / cellH;
+          const cAspect = r.w / r.h;
           let sw: number, sh: number, sx: number, sy: number;
 
-          if (imgAspect > cellAspect) {
+          if (imgAspect > cAspect) {
             sh = cached.naturalHeight;
-            sw = sh * cellAspect;
+            sw = sh * cAspect;
             sx = (cached.naturalWidth - sw) * cell.cropOffsetX;
             sy = 0;
           } else {
             sw = cached.naturalWidth;
-            sh = sw / cellAspect;
+            sh = sw / cAspect;
             sx = 0;
             sy = (cached.naturalHeight - sh) * cell.cropOffsetY;
           }
@@ -82,50 +80,26 @@ export default function GridCanvas({
             sh = zSh;
           }
 
-          ctx.drawImage(cached, sx, sy, sw, sh, x, y, cellW, cellH);
+          ctx.drawImage(cached, sx, sy, sw, sh, r.x, r.y, r.w, r.h);
           ctx.restore();
         } else {
-          // Still loading
           ctx.fillStyle = '#1e293b';
-          ctx.fillRect(x, y, cellW, cellH);
+          ctx.fillRect(r.x, r.y, r.w, r.h);
           ctx.fillStyle = '#64748b';
           ctx.font = '40px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('...', x + cellW / 2, y + cellH / 2);
+          ctx.fillText('...', r.x + r.w / 2, r.y + r.h / 2);
         }
       } else {
-        // Empty cell
+        // Empty cell background
         ctx.fillStyle = '#1e293b';
         if (borderRadius > 0) {
           ctx.beginPath();
-          ctx.roundRect(x, y, cellW, cellH, borderRadius);
+          ctx.roundRect(r.x, r.y, r.w, r.h, borderRadius);
           ctx.fill();
         } else {
-          ctx.fillRect(x, y, cellW, cellH);
-        }
-
-        // Plus icon
-        ctx.strokeStyle = '#475569';
-        ctx.lineWidth = 4;
-        const cx = x + cellW / 2;
-        const cy = y + cellH / 2;
-        const iconSize = Math.min(cellW, cellH) * 0.15;
-        ctx.beginPath();
-        ctx.moveTo(cx - iconSize, cy);
-        ctx.lineTo(cx + iconSize, cy);
-        ctx.moveTo(cx, cy - iconSize);
-        ctx.lineTo(cx, cy + iconSize);
-        ctx.stroke();
-
-        // Keyword label
-        if (cell.keyword) {
-          ctx.fillStyle = '#94a3b8';
-          ctx.font = `${Math.min(30, cellW * 0.06)}px sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          const text = cell.keyword.length > 20 ? cell.keyword.slice(0, 18) + '...' : cell.keyword;
-          ctx.fillText(text, cx, cy + iconSize + 30);
+          ctx.fillRect(r.x, r.y, r.w, r.h);
         }
       }
     }
@@ -134,20 +108,19 @@ export default function GridCanvas({
     if (selectedCellId) {
       const sel = cells.find((c) => c.id === selectedCellId);
       if (sel) {
-        const sx = gap + sel.col * (cellW + gap);
-        const sy = gap + sel.row * (cellH + gap);
+        const r = cellRect(template, gap, sel.row, sel.col);
         ctx.strokeStyle = '#818cf8';
         ctx.lineWidth = 6;
         if (borderRadius > 0) {
           ctx.beginPath();
-          ctx.roundRect(sx, sy, cellW, cellH, borderRadius);
+          ctx.roundRect(r.x, r.y, r.w, r.h, borderRadius);
           ctx.stroke();
         } else {
-          ctx.strokeRect(sx, sy, cellW, cellH);
+          ctx.strokeRect(r.x, r.y, r.w, r.h);
         }
       }
     }
-  }, [cells, template, gap, borderRadius, backgroundColor, selectedCellId, cellW, cellH]);
+  }, [cells, template, gap, borderRadius, backgroundColor, selectedCellId]);
 
   // Load images and redraw
   useEffect(() => {
@@ -176,60 +149,49 @@ export default function GridCanvas({
     };
   }, [cells, draw]);
 
-  // Handle click to select cell
-  function handleCanvasClick(e: React.MouseEvent<HTMLCanvasElement>) {
+  // Find which cell a mouse event lands on
+  function hitTest(e: React.MouseEvent | React.DragEvent): GridCellData | null {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = OUTPUT_WIDTH / rect.width;
-    const scaleY = OUTPUT_HEIGHT / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
+    const mx = ((e.clientX - rect.left) / rect.width) * OUTPUT_WIDTH;
+    const my = ((e.clientY - rect.top) / rect.height) * OUTPUT_HEIGHT;
 
     for (const cell of cells) {
-      const cx = gap + cell.col * (cellW + gap);
-      const cy = gap + cell.row * (cellH + gap);
-      if (mx >= cx && mx <= cx + cellW && my >= cy && my <= cy + cellH) {
-        onSelectCell(cell.id);
-        return;
+      const r = cellRect(template, gap, cell.row, cell.col);
+      if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
+        return cell;
       }
     }
+    return null;
   }
 
-  // Handle drag-and-drop
-  function handleDrop(e: React.DragEvent<HTMLCanvasElement>) {
+  // Handle drag-and-drop on the container
+  function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (!file || !file.type.startsWith('image/')) return;
 
-    // Find which cell was dropped on
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = OUTPUT_WIDTH / rect.width;
-    const scaleY = OUTPUT_HEIGHT / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
-
-    let targetId = selectedCellId;
-    for (const cell of cells) {
-      const cx = gap + cell.col * (cellW + gap);
-      const cy = gap + cell.row * (cellH + gap);
-      if (mx >= cx && mx <= cx + cellW && my >= cy && my <= cy + cellH) {
-        targetId = cell.id;
-        break;
-      }
-    }
-
+    const hit = hitTest(e);
+    const targetId = hit?.id ?? selectedCellId;
     if (!targetId) return;
 
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
-        onDropImage(targetId!, reader.result);
+        onDropImage(targetId, reader.result);
       }
     };
     reader.readAsDataURL(file);
+  }
+
+  function handleSearchAndSelect(cell: GridCellData) {
+    onSelectCell(cell.id);
+    const query = cell.keyword || `image ${cell.row + 1},${cell.col + 1}`;
+    window.open(
+      `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`,
+      '_blank',
+    );
   }
 
   return (
@@ -261,21 +223,135 @@ export default function GridCanvas({
       </div>
 
       <p className="text-xs text-muted mb-3">
-        Click a cell to select it, then paste an image or use the Chrome extension.
-        You can also drag & drop images directly onto cells.
+        Click &quot;Search&quot; on a cell to open Google Images. Use the Chrome extension to add the image.
+        You can also paste or drag & drop images.
       </p>
 
-      <div className="w-full overflow-hidden rounded-lg border border-card-border">
+      {/* Canvas + HTML overlays container */}
+      <div
+        ref={containerRef}
+        className="relative w-full overflow-hidden rounded-lg border border-card-border"
+        style={{ aspectRatio: '16/9' }}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={handleDrop}
+      >
         <canvas
           ref={canvasRef}
           width={OUTPUT_WIDTH}
           height={OUTPUT_HEIGHT}
-          onClick={handleCanvasClick}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          className="w-full h-auto cursor-pointer"
-          style={{ aspectRatio: '16/9' }}
+          className="absolute inset-0 w-full h-full"
         />
+
+        {/* HTML overlays for each cell */}
+        {cells.map((cell) => {
+          const r = cellRect(template, gap, cell.row, cell.col);
+          const xPct = (r.x / OUTPUT_WIDTH) * 100;
+          const yPct = (r.y / OUTPUT_HEIGHT) * 100;
+          const wPct = (r.w / OUTPUT_WIDTH) * 100;
+          const hPct = (r.h / OUTPUT_HEIGHT) * 100;
+          const isSelected = cell.id === selectedCellId;
+
+          return (
+            <div
+              key={cell.id}
+              className="absolute flex flex-col items-center justify-center cursor-pointer"
+              style={{
+                left: `${xPct}%`,
+                top: `${yPct}%`,
+                width: `${wPct}%`,
+                height: `${hPct}%`,
+                borderRadius: borderRadius > 0 ? `${borderRadius * (containerRef.current ? containerRef.current.clientWidth / OUTPUT_WIDTH : 0.5)}px` : undefined,
+              }}
+              onClick={() => onSelectCell(cell.id)}
+            >
+              {/* Empty cell overlay */}
+              {!cell.imageUrl && (
+                <div className="flex flex-col items-center justify-center gap-1 sm:gap-2 w-full h-full">
+                  <svg
+                    className="w-[12%] h-[12%] text-[#475569]"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+
+                  {cell.keyword && (
+                    <span className="text-[#94a3b8] text-[clamp(8px,1.2vw,14px)] font-medium uppercase tracking-wider text-center px-2 truncate max-w-[90%]">
+                      {cell.keyword}
+                    </span>
+                  )}
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSearchAndSelect(cell);
+                    }}
+                    className={`mt-1 flex items-center gap-1 rounded-lg px-2 py-1 sm:px-3 sm:py-1.5 text-[clamp(8px,1vw,12px)] font-semibold transition-all ${
+                      isSelected
+                        ? 'bg-accent text-white shadow-md'
+                        : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+                    }`}
+                  >
+                    <svg
+                      className="w-[clamp(8px,1vw,12px)] h-[clamp(8px,1vw,12px)]"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Search
+                  </button>
+                </div>
+              )}
+
+              {/* Filled cell hover overlay */}
+              {cell.imageUrl && (
+                <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 hover:opacity-100 transition-opacity bg-black/40 rounded-[inherit]">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSearchAndSelect(cell);
+                    }}
+                    className="flex items-center gap-1 rounded-lg bg-white/20 px-2 py-1 sm:px-3 sm:py-1.5 text-[clamp(8px,1vw,12px)] font-semibold text-white hover:bg-white/30 transition-colors backdrop-blur-sm"
+                  >
+                    <svg
+                      className="w-[clamp(8px,1vw,12px)] h-[clamp(8px,1vw,12px)]"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Replace
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveImage(cell.id);
+                    }}
+                    className="flex items-center gap-1 rounded-lg bg-red-500/30 px-2 py-1 sm:px-3 sm:py-1.5 text-[clamp(8px,1vw,12px)] font-semibold text-white hover:bg-red-500/50 transition-colors backdrop-blur-sm"
+                  >
+                    <svg
+                      className="w-[clamp(8px,1vw,12px)] h-[clamp(8px,1vw,12px)]"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -283,7 +283,7 @@ export default function GridderForm() {
 
     try {
       const payload = {
-        template: { cols: gridderState.template.cols, rows: gridderState.template.rows },
+        template: { cols: gridderState.template.cols, rows: gridderState.template.rows, colWeights: gridderState.template.colWeights },
         cells: gridderState.cells
           .filter((c) => c.imageUrl)
           .map((c) => ({

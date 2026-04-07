@@ -42,7 +42,9 @@ export default function TemplatePicker({ selected, onSelect }: TemplatePickerPro
                 className="w-full aspect-video rounded-md overflow-hidden"
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: `repeat(${tpl.cols}, 1fr)`,
+                  gridTemplateColumns: tpl.colWeights
+                    ? tpl.colWeights.map((w) => `${w}fr`).join(' ')
+                    : `repeat(${tpl.cols}, 1fr)`,
                   gridTemplateRows: `repeat(${tpl.rows}, 1fr)`,
                   gap: '2px',
                   padding: '2px',

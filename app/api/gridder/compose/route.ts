@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { cellRect } from '@/lib/grid-templates';
+import type { GridTemplate } from '@/lib/types';
 
 interface CellInput {
   row: number;
@@ -11,7 +13,7 @@ interface CellInput {
 }
 
 interface ComposeRequest {
-  template: { cols: number; rows: number };
+  template: { cols: number; rows: number; colWeights?: number[] };
   cells: CellInput[];
   gap: number;
   borderRadius: number;
@@ -32,17 +34,21 @@ export async function POST(request: NextRequest) {
     ctx.fillStyle = backgroundColor || '#000000';
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-    const cellW = (WIDTH - gap * (template.cols + 1)) / template.cols;
-    const cellH = (HEIGHT - gap * (template.rows + 1)) / template.rows;
+    // Build a GridTemplate for cellRect
+    const tpl: GridTemplate = {
+      id: 'compose',
+      label: '',
+      cols: template.cols,
+      rows: template.rows,
+      colWeights: template.colWeights,
+    };
 
     for (const cell of cells) {
       if (!cell.imageBase64) continue;
 
-      const x = gap + cell.col * (cellW + gap);
-      const y = gap + cell.row * (cellH + gap);
+      const r = cellRect(tpl, gap, cell.row, cell.col);
 
       try {
-        // Strip data URI prefix if present
         let raw = cell.imageBase64;
         const commaIdx = raw.indexOf(',');
         if (commaIdx !== -1 && raw.startsWith('data:')) {
@@ -54,53 +60,46 @@ export async function POST(request: NextRequest) {
 
         ctx.save();
 
-        // Clip to rounded rect
         if (borderRadius > 0) {
           ctx.beginPath();
-          ctx.roundRect(x, y, cellW, cellH, borderRadius);
+          ctx.roundRect(r.x, r.y, r.w, r.h, borderRadius);
           ctx.clip();
         }
 
         // Cover-fit calculation
         const imgAspect = img.width / img.height;
-        const cellAspect = cellW / cellH;
+        const cAspect = r.w / r.h;
 
         let sw: number, sh: number, sx: number, sy: number;
 
-        if (imgAspect > cellAspect) {
-          // Image is wider — crop sides
+        if (imgAspect > cAspect) {
           sh = img.height;
-          sw = sh * cellAspect;
-          const maxOffsetX = img.width - sw;
-          sx = maxOffsetX * (cell.cropOffsetX ?? 0.5);
+          sw = sh * cAspect;
+          sx = (img.width - sw) * (cell.cropOffsetX ?? 0.5);
           sy = 0;
         } else {
-          // Image is taller — crop top/bottom
           sw = img.width;
-          sh = sw / cellAspect;
-          const maxOffsetY = img.height - sh;
+          sh = sw / cAspect;
           sx = 0;
-          sy = maxOffsetY * (cell.cropOffsetY ?? 0.5);
+          sy = (img.height - sh) * (cell.cropOffsetY ?? 0.5);
         }
 
-        // Apply zoom
         const zoom = cell.zoom ?? 1;
         if (zoom > 1) {
-          const zoomSw = sw / zoom;
-          const zoomSh = sh / zoom;
-          sx += (sw - zoomSw) * (cell.cropOffsetX ?? 0.5);
-          sy += (sh - zoomSh) * (cell.cropOffsetY ?? 0.5);
-          sw = zoomSw;
-          sh = zoomSh;
+          const zSw = sw / zoom;
+          const zSh = sh / zoom;
+          sx += (sw - zSw) * (cell.cropOffsetX ?? 0.5);
+          sy += (sh - zSh) * (cell.cropOffsetY ?? 0.5);
+          sw = zSw;
+          sh = zSh;
         }
 
-        ctx.drawImage(img, sx, sy, sw, sh, x, y, cellW, cellH);
+        ctx.drawImage(img, sx, sy, sw, sh, r.x, r.y, r.w, r.h);
         ctx.restore();
       } catch (imgErr) {
         console.error(`[compose] Failed to load image for cell ${cell.row},${cell.col}:`, imgErr);
-        // Draw placeholder
         ctx.fillStyle = '#1e293b';
-        ctx.fillRect(x, y, cellW, cellH);
+        ctx.fillRect(r.x, r.y, r.w, r.h);
       }
     }
 

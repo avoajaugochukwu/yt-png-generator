@@ -65,6 +65,8 @@ export interface GridTemplate {
   label: string;
   cols: number;
   rows: number;
+  /** Optional per-column weight ratios (e.g. [7, 3] for 70/30 split). Defaults to equal weights. */
+  colWeights?: number[];
 }
 
 export interface GridCellData {
