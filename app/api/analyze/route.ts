@@ -14,6 +14,8 @@ Given a script, identify these element types:
 
 3. "point-of-interest" — Notable facts, statistics, key phrases, or important terms worth highlighting as smaller callouts. These are supplementary — use them sparingly (1-3 per listicle item, only when genuinely notable).
 
+4. "subscribe" — Whenever the script mentions "subscribe", "subscribing", "hit subscribe", or any call-to-action asking viewers to subscribe, create a subscribe element. The text should be "SUBSCRIBE" (always this exact word). This element gets a special red background with a white heart emoji, so keep the text as just "SUBSCRIBE". There can be multiple subscribe elements if the script mentions subscribing at different points.
+
 Rules:
 - For listicles: identify ALL numbered items, no matter how many. A "Top 20" list must have 20 listicle-heading elements.
 - The main-title should be a concise summary (2-5 words) of the overall video topic.
@@ -48,6 +50,13 @@ Return JSON in this exact format:
       "text": "Peak oil content at dawn",
       "timestamp": 22.0,
       "timestampEnd": 24.5
+    },
+    {
+      "id": "el-04",
+      "type": "subscribe",
+      "text": "SUBSCRIBE",
+      "timestamp": 45.0,
+      "timestampEnd": 48.0
     }
   ]
 }`;

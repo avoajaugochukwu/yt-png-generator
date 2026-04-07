@@ -13,6 +13,8 @@ const FFPROBE = process.env.FFPROBE_PATH || '/usr/bin/ffprobe';
 const MAX_CHUNK_SIZE = 24 * 1024 * 1024; // 24MB safety margin
 const MAX_CONCURRENT = 3;
 
+const VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.webm', '.mov', '.avi']);
+
 interface SilenceInterval {
   start: number;
   end: number;
@@ -27,6 +29,19 @@ interface ChunkResult {
   segments: TranscriptSegment[];
   text: string;
   startTime: number;
+}
+
+async function extractAudio(videoPath: string, tempDir: string): Promise<string> {
+  const outputPath = path.join(tempDir, 'extracted.mp3');
+  await execFile(FFMPEG, [
+    '-i', videoPath,
+    '-vn',
+    '-c:a', 'libmp3lame',
+    '-b:a', '128k',
+    '-y',
+    outputPath,
+  ]);
+  return outputPath;
 }
 
 async function getDuration(inputPath: string): Promise<number> {
@@ -235,11 +250,19 @@ export async function transcribeLargeAudio(
 
   try {
     const ext = path.extname(fileName) || '.mp3';
-    const inputPath = path.join(tempDir, `input${ext}`);
-    await fs.writeFile(inputPath, fileBuffer);
+    const rawPath = path.join(tempDir, `input${ext}`);
+    await fs.writeFile(rawPath, fileBuffer);
 
+    // If the input is a video file, extract audio first
+    let inputPath = rawPath;
+    if (VIDEO_EXTENSIONS.has(ext.toLowerCase())) {
+      console.log(`[audio-chunker] Video detected, extracting audio from ${fileName}`);
+      inputPath = await extractAudio(rawPath, tempDir);
+    }
+
+    const stat = await fs.stat(inputPath);
     const duration = await getDuration(inputPath);
-    const fileSize = fileBuffer.length;
+    const fileSize = stat.size;
 
     console.log(`[audio-chunker] File: ${fileName}, size: ${(fileSize / 1024 / 1024).toFixed(1)}MB, duration: ${duration.toFixed(1)}s`);
 

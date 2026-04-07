@@ -10,6 +10,11 @@ const ALLOWED_TYPES = new Set([
   'audio/mp4',
   'audio/x-m4a',
   'audio/m4a',
+  'video/mp4',
+  'video/x-matroska',
+  'video/webm',
+  'video/quicktime',
+  'video/x-msvideo',
 ]);
 
 export async function POST(request: NextRequest) {
@@ -23,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     if (!ALLOWED_TYPES.has(audioFile.type)) {
       return Response.json(
-        { error: 'Invalid file type. Accepted: mp3, wav, m4a' },
+        { error: 'Invalid file type. Accepted: mp3, wav, m4a, mp4, mkv, webm, mov, avi' },
         { status: 400 }
       );
     }

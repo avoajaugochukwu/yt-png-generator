@@ -30,6 +30,7 @@ const SIZE_CONFIGS: Record<VisualElement['type'], SizeConfig> = {
   'main-title': { maxWidth: 1400, fontSize: 120 },
   'listicle-heading': { maxWidth: 1200, fontSize: 84 },
   'point-of-interest': { maxWidth: 800, fontSize: 63 },
+  'subscribe': { maxWidth: 1000, fontSize: 96 },
 };
 
 function wrapText(
@@ -61,9 +62,19 @@ export function generatePng(
   element: VisualElement,
   options: CustomizationOptions
 ): { buffer: Buffer; width: number; height: number } {
+  const isSubscribe = element.type === 'subscribe';
   const config = SIZE_CONFIGS[element.type];
   const fontFamily = FONT_MAP[options.fontFamily] || 'Inter';
   const fontSpec = `${config.fontSize}px "${fontFamily}"`;
+
+  // Subscribe type always uses red bg + white text
+  const bgColor = isSubscribe ? '#FF0000' : options.backgroundColor;
+  const textColor = isSubscribe ? '#FFFFFF' : options.textColor;
+
+  // Heart emoji dimensions for subscribe type
+  const heartText = '\u2764';
+  const heartFontSpec = `${config.fontSize}px serif`;
+  const heartGap = Math.round(config.fontSize * 0.4);
 
   // First pass: measure text to determine canvas dimensions
   const measureCanvas = createCanvas(config.maxWidth, 100);
@@ -72,7 +83,15 @@ export function generatePng(
 
   const availableWidth = config.maxWidth - PADDING * 2;
   const uppercaseText = element.text.toUpperCase();
-  const lines = wrapText(measureCtx, uppercaseText, availableWidth);
+
+  let heartWidth = 0;
+  if (isSubscribe) {
+    measureCtx.font = heartFontSpec;
+    heartWidth = measureCtx.measureText(heartText).width + heartGap;
+    measureCtx.font = fontSpec;
+  }
+
+  const lines = wrapText(measureCtx, uppercaseText, availableWidth - heartWidth);
 
   const lineHeight = config.fontSize * 1.4;
   const textBlockHeight = lines.length * lineHeight;
@@ -83,7 +102,7 @@ export function generatePng(
   const ctx = canvas.getContext('2d');
 
   // Background
-  ctx.fillStyle = options.backgroundColor;
+  ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, config.maxWidth, canvasHeight);
 
   // Left bar for headings
@@ -94,8 +113,8 @@ export function generatePng(
   }
 
   // Text — uppercase, vertically centered
-  const isCentered = element.type === 'main-title';
-  ctx.fillStyle = options.textColor;
+  const isCentered = element.type === 'main-title' || isSubscribe;
+  ctx.fillStyle = textColor;
   ctx.font = fontSpec;
   ctx.textBaseline = 'middle';
   ctx.textAlign = isCentered ? 'center' : 'left';
@@ -105,8 +124,31 @@ export function generatePng(
   const centerY = canvasHeight / 2;
   const firstLineY = centerY - ((lines.length - 1) * lineHeight) / 2;
 
-  for (let i = 0; i < lines.length; i++) {
-    ctx.fillText(lines[i], startX, firstLineY + i * lineHeight);
+  if (isSubscribe) {
+    // Draw heart + text centered together
+    ctx.textAlign = 'left';
+    for (let i = 0; i < lines.length; i++) {
+      const lineY = firstLineY + i * lineHeight;
+      // Measure this line to center heart+text block
+      ctx.font = fontSpec;
+      const textW = ctx.measureText(lines[i]).width;
+      const totalW = heartWidth + textW;
+      const blockX = (config.maxWidth - totalW) / 2;
+
+      // Draw heart emoji in white
+      ctx.font = heartFontSpec;
+      ctx.fillStyle = textColor;
+      ctx.fillText(heartText, blockX, lineY);
+
+      // Draw text
+      ctx.font = fontSpec;
+      ctx.fillStyle = textColor;
+      ctx.fillText(lines[i], blockX + heartWidth, lineY);
+    }
+  } else {
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], startX, firstLineY + i * lineHeight);
+    }
   }
 
   const buffer = canvas.toBuffer('image/png');

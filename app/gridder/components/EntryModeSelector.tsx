@@ -57,12 +57,12 @@ export default function EntryModeSelector({
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
             </svg>
           </div>
-          <span className="text-sm font-semibold text-foreground">Upload Audio</span>
+          <span className="text-sm font-semibold text-foreground">Upload Audio / Video</span>
           <span className="text-xs text-muted">Transcribe & analyze to generate keyword suggestions.</span>
           <input
             ref={fileRef}
             type="file"
-            accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/x-m4a"
+            accept=".mp3,.wav,.m4a,.mp4,.mkv,.webm,.mov,.avi,audio/mpeg,audio/wav,audio/x-m4a,video/mp4,video/x-matroska,video/webm,video/quicktime,video/x-msvideo"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -94,7 +94,7 @@ export default function EntryModeSelector({
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          Processing audio...
+          Processing media...
         </div>
       )}
     </div>
