@@ -60,6 +60,13 @@ export type AppStep = 'input' | 'analyzing' | 'customizing' | 'generating' | 'do
 
 // ── Gridder types ──
 
+export interface CellDef {
+  col: number;
+  row: number;
+  colSpan?: number;
+  rowSpan?: number;
+}
+
 export interface GridTemplate {
   id: string;
   label: string;
@@ -67,12 +74,16 @@ export interface GridTemplate {
   rows: number;
   /** Optional per-column weight ratios (e.g. [7, 3] for 70/30 split). Defaults to equal weights. */
   colWeights?: number[];
+  /** Optional custom cell layout with spans. Overrides the uniform grid when present. */
+  cellDefs?: CellDef[];
 }
 
 export interface GridCellData {
   id: string;
   row: number;
   col: number;
+  colSpan: number;
+  rowSpan: number;
   imageUrl: string | null;
   cropOffsetX: number;
   cropOffsetY: number;

@@ -6,6 +6,8 @@ import type { GridTemplate } from '@/lib/types';
 interface CellInput {
   row: number;
   col: number;
+  colSpan?: number;
+  rowSpan?: number;
   imageBase64: string;
   cropOffsetX: number;
   cropOffsetY: number;
@@ -46,7 +48,7 @@ export async function POST(request: NextRequest) {
     for (const cell of cells) {
       if (!cell.imageBase64) continue;
 
-      const r = cellRect(tpl, gap, cell.row, cell.col);
+      const r = cellRect(tpl, gap, cell.row, cell.col, cell.colSpan ?? 1, cell.rowSpan ?? 1);
 
       try {
         let raw = cell.imageBase64;

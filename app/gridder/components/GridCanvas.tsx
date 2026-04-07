@@ -43,7 +43,7 @@ export default function GridCanvas({
     ctx.fillRect(0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT);
 
     for (const cell of cells) {
-      const r = cellRect(template, gap, cell.row, cell.col);
+      const r = cellRect(template, gap, cell.row, cell.col, cell.colSpan, cell.rowSpan);
 
       if (cell.imageUrl) {
         const cached = imgCacheRef.current.get(cell.imageUrl);
@@ -108,7 +108,7 @@ export default function GridCanvas({
     if (selectedCellId) {
       const sel = cells.find((c) => c.id === selectedCellId);
       if (sel) {
-        const r = cellRect(template, gap, sel.row, sel.col);
+        const r = cellRect(template, gap, sel.row, sel.col, sel.colSpan, sel.rowSpan);
         ctx.strokeStyle = '#818cf8';
         ctx.lineWidth = 6;
         if (borderRadius > 0) {
@@ -158,7 +158,7 @@ export default function GridCanvas({
     const my = ((e.clientY - rect.top) / rect.height) * OUTPUT_HEIGHT;
 
     for (const cell of cells) {
-      const r = cellRect(template, gap, cell.row, cell.col);
+      const r = cellRect(template, gap, cell.row, cell.col, cell.colSpan, cell.rowSpan);
       if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
         return cell;
       }
@@ -244,7 +244,7 @@ export default function GridCanvas({
 
         {/* HTML overlays for each cell */}
         {cells.map((cell) => {
-          const r = cellRect(template, gap, cell.row, cell.col);
+          const r = cellRect(template, gap, cell.row, cell.col, cell.colSpan, cell.rowSpan);
           const xPct = (r.x / OUTPUT_WIDTH) * 100;
           const yPct = (r.y / OUTPUT_HEIGHT) * 100;
           const wPct = (r.w / OUTPUT_WIDTH) * 100;

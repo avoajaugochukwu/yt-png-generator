@@ -51,15 +51,27 @@ export default function TemplatePicker({ selected, onSelect }: TemplatePickerPro
                   backgroundColor: isSelected ? 'var(--accent)' : 'var(--muted-light)',
                 }}
               >
-                {Array.from({ length: tpl.cols * tpl.rows }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="rounded-[2px]"
-                    style={{
-                      backgroundColor: isSelected ? 'var(--accent-light)' : 'var(--surface)',
-                    }}
-                  />
-                ))}
+                {tpl.cellDefs
+                  ? tpl.cellDefs.map((def, i) => (
+                      <div
+                        key={i}
+                        className="rounded-[2px]"
+                        style={{
+                          backgroundColor: isSelected ? 'var(--accent-light)' : 'var(--surface)',
+                          gridColumn: `${def.col + 1} / span ${def.colSpan ?? 1}`,
+                          gridRow: `${def.row + 1} / span ${def.rowSpan ?? 1}`,
+                        }}
+                      />
+                    ))
+                  : Array.from({ length: tpl.cols * tpl.rows }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="rounded-[2px]"
+                        style={{
+                          backgroundColor: isSelected ? 'var(--accent-light)' : 'var(--surface)',
+                        }}
+                      />
+                    ))}
               </div>
               <span
                 className={`text-xs font-medium ${

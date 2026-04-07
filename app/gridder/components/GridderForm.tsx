@@ -294,6 +294,8 @@ export default function GridderForm() {
           .map((c) => ({
             row: c.row,
             col: c.col,
+            colSpan: c.colSpan,
+            rowSpan: c.rowSpan,
             imageBase64: c.imageUrl!,
             cropOffsetX: c.cropOffsetX,
             cropOffsetY: c.cropOffsetY,
