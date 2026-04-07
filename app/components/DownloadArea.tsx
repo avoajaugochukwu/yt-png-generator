@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { VisualElement, TimelineEntry } from '@/lib/types';
 
 interface DownloadAreaProps {
@@ -52,6 +53,15 @@ export default function DownloadArea({ zipUrl, elements, scriptText, timeline }:
               </svg>
               Download ZIP
             </a>
+            <Link
+              href="/gridder"
+              className="mt-3 inline-flex items-center gap-2 rounded-xl border border-accent/30 bg-accent-light px-4 py-2 text-sm font-medium text-accent hover:bg-accent/10 transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+              </svg>
+              Continue to Gridder
+            </Link>
           </div>
         </div>
       </div>

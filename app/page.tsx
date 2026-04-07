@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import ForgeForm from './components/ForgeForm';
 
 export default function Home() {
@@ -22,6 +23,15 @@ export default function Home() {
             Generate PNG overlays and timeline data from your video scripts using AI.
             Paste a script, customize your style, and download production-ready assets.
           </p>
+          <Link
+            href="/gridder"
+            className="mt-3 inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+            </svg>
+            Try Gridder — composite thumbnail grids
+          </Link>
         </div>
       </div>
 

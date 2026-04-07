@@ -11,13 +11,13 @@ import {
   saveCurrentSession,
   getCurrentSession,
   clearCurrentSession,
+  saveSharedAnalysis,
   type CurrentSession,
 } from '@/lib/idb';
 import InputSection from './InputSection';
 import CustomizationPanel from './CustomizationPanel';
 import GenerateButton from './GenerateButton';
 import DownloadArea from './DownloadArea';
-import VideoOverlaySection from './VideoOverlaySection';
 
 const STEPS: { key: AppStep; label: string }[] = [
   { key: 'input', label: 'Script' },
@@ -194,6 +194,13 @@ export default function ForgeForm() {
       const data = await res.json();
       setElements(data.elements);
       setStep('customizing');
+
+      // Persist analysis for Gridder module
+      saveSharedAnalysis({
+        elements: data.elements,
+        scriptText: script,
+        savedAt: new Date().toISOString(),
+      }).catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('input');
@@ -389,10 +396,6 @@ export default function ForgeForm() {
       {/* Download */}
       <DownloadArea zipUrl={zipUrl} elements={elements} scriptText={scriptText} timeline={timeline} />
 
-      {/* Video overlay */}
-      {step === 'done' && timeline && timeline.length > 0 && (
-        <VideoOverlaySection timeline={timeline} />
-      )}
     </div>
   );
 }

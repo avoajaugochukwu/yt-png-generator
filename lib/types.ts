@@ -57,3 +57,33 @@ export interface TimelineJson {
 }
 
 export type AppStep = 'input' | 'analyzing' | 'customizing' | 'generating' | 'done';
+
+// ── Gridder types ──
+
+export interface GridTemplate {
+  id: string;
+  label: string;
+  cols: number;
+  rows: number;
+}
+
+export interface GridCellData {
+  id: string;
+  row: number;
+  col: number;
+  imageUrl: string | null;
+  cropOffsetX: number;
+  cropOffsetY: number;
+  zoom: number;
+  keyword: string;
+}
+
+export interface GridderState {
+  template: GridTemplate;
+  cells: GridCellData[];
+  gap: number;
+  borderRadius: number;
+  backgroundColor: string;
+}
+
+export type GridderStep = 'setup' | 'filling' | 'done';
