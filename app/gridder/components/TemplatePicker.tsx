@@ -24,14 +24,14 @@ export default function TemplatePicker({ selected, onSelect }: TemplatePickerPro
         <h3 className="text-sm font-semibold text-foreground">Grid Template</h3>
       </div>
 
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
         {BUILT_IN_TEMPLATES.map((tpl) => {
           const isSelected = selected.id === tpl.id;
           return (
             <button
               key={tpl.id}
               onClick={() => onSelect(tpl)}
-              className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-all ${
+              className={`shrink-0 flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-all w-28 ${
                 isSelected
                   ? 'border-accent bg-accent-light shadow-sm'
                   : 'border-card-border hover:border-accent/40 hover:bg-surface'

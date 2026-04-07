@@ -244,13 +244,18 @@ export default function GridderForm() {
     setStep('filling');
   }
 
-  // Template change
+  // Template change — carry over images from old cells by index
   function handleTemplateChange(tpl: GridTemplate) {
-    setGridderState((prev) => ({
-      ...prev,
-      template: tpl,
-      cells: createCells(tpl, keywords),
-    }));
+    setGridderState((prev) => {
+      const newCells = createCells(tpl, keywords);
+      for (let i = 0; i < newCells.length && i < prev.cells.length; i++) {
+        newCells[i].imageUrl = prev.cells[i].imageUrl;
+        newCells[i].cropOffsetX = prev.cells[i].cropOffsetX;
+        newCells[i].cropOffsetY = prev.cells[i].cropOffsetY;
+        newCells[i].zoom = prev.cells[i].zoom;
+      }
+      return { ...prev, template: tpl, cells: newCells };
+    });
     setSelectedCellId(null);
   }
 
