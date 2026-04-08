@@ -34,7 +34,7 @@ export default function Header() {
                 href={href}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-accent text-foreground'
+                    ? 'bg-accent text-white'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                 }`}
               >

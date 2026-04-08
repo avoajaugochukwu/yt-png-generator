@@ -234,6 +234,71 @@ export default function GridderForm() {
     }
   }
 
+  async function handleYouTubeUrl(url: string) {
+    setError('');
+    setIsLoading(true);
+
+    try {
+      // Fetch transcript from external API
+      const transcriptRes = await fetch(
+        'https://youtube-transcript-production-18aa.up.railway.app/api/transcript',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        },
+      );
+      if (!transcriptRes.ok) {
+        const data = await transcriptRes.json().catch(() => ({}));
+        throw new Error(data.message || data.error || 'Failed to fetch transcript');
+      }
+      const transcript = await transcriptRes.json();
+
+      // The transcript response may be a string or have a text/transcript field
+      const scriptText =
+        typeof transcript === 'string'
+          ? transcript
+          : transcript.transcript || transcript.text || transcript.fullText || JSON.stringify(transcript);
+
+      // Analyze
+      const analyzeRes = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script: scriptText }),
+      });
+      if (!analyzeRes.ok) {
+        const data = await analyzeRes.json();
+        throw new Error(data.error || 'Analysis failed');
+      }
+      const data = await analyzeRes.json();
+
+      const kws = data.elements
+        .filter((el: { type: string }) => el.type === 'listicle-heading')
+        .map((el: { text: string }) => extractKeyword(el.text));
+
+      setKeywords(kws);
+      const count = kws.length;
+      let tpl = BUILT_IN_TEMPLATES.find(
+        (t) => t.cols * t.rows >= count && t.cols * t.rows <= count + 2,
+      ) ?? DEFAULT_TEMPLATE;
+
+      if (count > 10) {
+        tpl = { id: `${Math.ceil(count / 2)}x2`, label: `${Math.ceil(count / 2)} x 2`, cols: Math.ceil(count / 2), rows: 2 };
+      }
+
+      setGridderState((prev) => ({
+        ...prev,
+        template: tpl,
+        cells: createCells(tpl, kws),
+      }));
+      setStep('filling');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process YouTube URL');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   function handleStartFresh() {
     setKeywords([]);
     setGridderState((prev) => ({
@@ -433,6 +498,7 @@ export default function GridderForm() {
           hasAnalysis={hasAnalysis}
           onUseAnalysis={handleUseAnalysis}
           onUploadAudio={handleUploadAudio}
+          onYouTubeUrl={handleYouTubeUrl}
           onStartFresh={handleStartFresh}
           isLoading={isLoading}
         />
