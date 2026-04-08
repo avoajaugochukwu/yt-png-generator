@@ -16,6 +16,7 @@ import EntryModeSelector from './EntryModeSelector';
 import TemplatePicker from './TemplatePicker';
 import GridCanvas from './GridCanvas';
 import KeywordSidebar, { extractKeyword } from './KeywordSidebar';
+import GridHistory from './GridHistory';
 
 const DEFAULT_TEMPLATE = BUILT_IN_TEMPLATES[2]; // 3x2
 
@@ -494,14 +495,17 @@ export default function GridderForm() {
 
       {/* Setup step */}
       {step === 'setup' && (
-        <EntryModeSelector
-          hasAnalysis={hasAnalysis}
-          onUseAnalysis={handleUseAnalysis}
-          onUploadAudio={handleUploadAudio}
-          onYouTubeUrl={handleYouTubeUrl}
-          onStartFresh={handleStartFresh}
-          isLoading={isLoading}
-        />
+        <>
+          <EntryModeSelector
+            hasAnalysis={hasAnalysis}
+            onUseAnalysis={handleUseAnalysis}
+            onUploadAudio={handleUploadAudio}
+            onYouTubeUrl={handleYouTubeUrl}
+            onStartFresh={handleStartFresh}
+            isLoading={isLoading}
+          />
+          <GridHistory />
+        </>
       )}
 
       {/* Filling step */}

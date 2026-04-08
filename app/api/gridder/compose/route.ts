@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { cellRect } from '@/lib/grid-templates';
 import type { GridTemplate } from '@/lib/types';
+import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
+import { appendHistory, type HistoryEntry } from '@/lib/history';
 
 interface CellInput {
   row: number;
@@ -108,6 +110,11 @@ export async function POST(request: NextRequest) {
     const buffer = canvas.toBuffer('image/png');
     const base64 = Buffer.from(buffer).toString('base64');
 
+    // Save to history (fire-and-forget, don't block the response)
+    saveToHistory(base64, template, cells.length, gap, borderRadius, backgroundColor).catch(
+      (err) => console.error('[compose] History save failed:', err),
+    );
+
     return Response.json({ png: base64 });
   } catch (err) {
     console.error('[compose] Error:', err);
@@ -116,4 +123,48 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+async function saveToHistory(
+  fullBase64: string,
+  template: ComposeRequest['template'],
+  cellCount: number,
+  gap: number,
+  borderRadius: number,
+  backgroundColor: string,
+) {
+  // Generate a small thumbnail (320x180) for the history preview
+  const thumbCanvas = createCanvas(320, 180);
+  const thumbCtx = thumbCanvas.getContext('2d');
+  const fullImg = await loadImage(Buffer.from(fullBase64, 'base64'));
+  thumbCtx.drawImage(fullImg, 0, 0, 320, 180);
+  const thumbnail = Buffer.from(thumbCanvas.toBuffer('image/png')).toString('base64');
+
+  // Get user info from Kinde
+  const { getUser } = getKindeServerSession();
+  let userName: string | null = null;
+  let userEmail: string | null = null;
+  try {
+    const user = await getUser();
+    if (user) {
+      userName = [user.given_name, user.family_name].filter(Boolean).join(' ') || null;
+      userEmail = user.email ?? null;
+    }
+  } catch {
+    // Not authenticated or Kinde unavailable — continue without user info
+  }
+
+  const entry: HistoryEntry = {
+    id: crypto.randomUUID(),
+    date: new Date().toISOString(),
+    user: { name: userName, email: userEmail },
+    template: { cols: template.cols, rows: template.rows },
+    cellCount,
+    gap,
+    borderRadius,
+    backgroundColor,
+    thumbnail: `data:image/png;base64,${thumbnail}`,
+  };
+
+  await appendHistory(entry);
 }
