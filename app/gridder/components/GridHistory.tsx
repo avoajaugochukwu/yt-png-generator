@@ -6,8 +6,10 @@ import { relativeTime } from '@/lib/relative-time';
 interface HistoryEntry {
   id: string;
   date: string;
+  title: string;
   user: { name: string | null; email: string | null };
-  template: { cols: number; rows: number };
+  keywords: string[];
+  template: { cols: number; rows: number; colWeights?: number[] };
   cellCount: number;
   gap: number;
   borderRadius: number;
@@ -15,7 +17,18 @@ interface HistoryEntry {
   thumbnail: string | null;
 }
 
-export default function GridHistory() {
+interface GridHistoryProps {
+  onRestore: (entry: {
+    title: string;
+    keywords: string[];
+    template: { cols: number; rows: number; colWeights?: number[] };
+    gap: number;
+    borderRadius: number;
+    backgroundColor: string;
+  }) => void;
+}
+
+export default function GridHistory({ onRestore }: GridHistoryProps) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -54,36 +67,42 @@ export default function GridHistory() {
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-4">
         {history.map((entry) => (
-          <div
+          <button
             key={entry.id}
-            className="group rounded-lg border border-card-border bg-surface overflow-hidden hover:border-accent/40 transition-colors"
+            onClick={() => onRestore(entry)}
+            className="group rounded-lg border border-card-border bg-surface overflow-hidden hover:border-accent/40 hover:shadow-md hover:shadow-accent-glow/10 transition-all text-left"
           >
             {entry.thumbnail && (
               <div className="aspect-video bg-black">
                 <img
                   src={entry.thumbnail}
-                  alt="Grid thumbnail"
-                  className="w-full h-full object-cover"
+                  alt={entry.title}
+                  className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
                 />
               </div>
             )}
             <div className="p-2 space-y-1">
+              <p className="text-[11px] font-medium text-foreground truncate">
+                {entry.title || 'Untitled'}
+              </p>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-medium text-muted-light">
+                <span className="text-[10px] text-muted-light">
                   {entry.template.cols}x{entry.template.rows}
                 </span>
                 <span className="text-[10px] text-muted-light">
-                  {entry.cellCount} cells
+                  {entry.keywords?.length || 0} keywords
                 </span>
               </div>
-              <p className="text-[11px] text-muted truncate">
-                {entry.user.name || entry.user.email || 'Anonymous'}
-              </p>
-              <p className="text-[10px] text-muted-light">
-                {relativeTime(entry.date)}
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] text-muted truncate max-w-[60%]">
+                  {entry.user.name || entry.user.email || 'Anonymous'}
+                </p>
+                <p className="text-[10px] text-muted-light">
+                  {relativeTime(entry.date)}
+                </p>
+              </div>
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>

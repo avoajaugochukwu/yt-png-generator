@@ -27,8 +27,11 @@ Rules:
 - Order elements chronologically as they appear in the script.
 - Enforce a minimum 20-second gap between any two consecutive elements that have timestamps (e.g., a listicle-heading and its following point-of-interest must be at least 20s apart, and the same applies between consecutive points-of-interest). If the script places them closer together, push the later element's timestamp forward so the gap is at least 20 seconds — but never push it past the next listicle-heading's timestamp. A heading and its first POI must NEVER share the same timestamp.
 
+Also generate a short "suggestedTitle" (3-8 words) that summarizes the video topic — this will be used as a session label. It should be descriptive and human-readable (e.g., "10 Luxury Plants You Need", "Best Budget Cameras 2024").
+
 Return JSON in this exact format:
 {
+  "suggestedTitle": "10 Luxury Plants You Need",
   "elements": [
     {
       "id": "el-01",

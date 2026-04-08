@@ -24,6 +24,7 @@ export interface AnalyzeRequest {
 }
 
 export interface AnalyzeResponse {
+  suggestedTitle?: string;
   elements: VisualElement[];
 }
 

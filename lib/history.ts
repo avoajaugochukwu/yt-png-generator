@@ -8,11 +8,13 @@ const MAX_ENTRIES = 200;
 export interface HistoryEntry {
   id: string;
   date: string; // ISO string
+  title: string;
   user: {
     name: string | null;
     email: string | null;
   };
-  template: { cols: number; rows: number };
+  keywords: string[];
+  template: { cols: number; rows: number; colWeights?: number[] };
   cellCount: number;
   gap: number;
   borderRadius: number;

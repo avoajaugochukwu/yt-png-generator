@@ -68,6 +68,7 @@ export default function GridderForm() {
   });
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
   const [keywords, setKeywords] = useState<string[]>([]);
+  const [title, setTitle] = useState('');
   const [hasAnalysis, setHasAnalysis] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -158,6 +159,8 @@ export default function GridderForm() {
       .filter((el) => el.type === 'listicle-heading')
       .map((el) => extractKeyword(el.text));
 
+    const mainTitle = analysis.elements.find((el) => el.type === 'main-title');
+    setTitle((analysis as unknown as { suggestedTitle?: string }).suggestedTitle || mainTitle?.text || '');
     setKeywords(kws);
 
     // Pick a template that fits the keyword count
@@ -212,6 +215,7 @@ export default function GridderForm() {
         .filter((el: { type: string }) => el.type === 'listicle-heading')
         .map((el: { text: string }) => extractKeyword(el.text));
 
+      setTitle(data.suggestedTitle || '');
       setKeywords(kws);
       const count = kws.length;
       let tpl = BUILT_IN_TEMPLATES.find(
@@ -277,6 +281,7 @@ export default function GridderForm() {
         .filter((el: { type: string }) => el.type === 'listicle-heading')
         .map((el: { text: string }) => extractKeyword(el.text));
 
+      setTitle(data.suggestedTitle || '');
       setKeywords(kws);
       const count = kws.length;
       let tpl = BUILT_IN_TEMPLATES.find(
@@ -298,6 +303,34 @@ export default function GridderForm() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function handleRestoreHistory(entry: {
+    title: string;
+    keywords: string[];
+    template: { cols: number; rows: number; colWeights?: number[] };
+    gap: number;
+    borderRadius: number;
+    backgroundColor: string;
+  }) {
+    const tpl: GridTemplate = {
+      id: `${entry.template.cols}x${entry.template.rows}`,
+      label: `${entry.template.cols} x ${entry.template.rows}`,
+      cols: entry.template.cols,
+      rows: entry.template.rows,
+      colWeights: entry.template.colWeights,
+    };
+
+    setTitle(entry.title);
+    setKeywords(entry.keywords);
+    setGridderState({
+      template: tpl,
+      cells: createCells(tpl, entry.keywords),
+      gap: entry.gap,
+      borderRadius: entry.borderRadius,
+      backgroundColor: entry.backgroundColor,
+    });
+    setStep('filling');
   }
 
   function handleStartFresh() {
@@ -370,6 +403,8 @@ export default function GridderForm() {
         gap: gridderState.gap,
         borderRadius: gridderState.borderRadius,
         backgroundColor: gridderState.backgroundColor,
+        title: title || undefined,
+        keywords: keywords.length > 0 ? keywords : undefined,
       };
 
       const res = await fetch('/api/gridder/compose', {
@@ -411,6 +446,7 @@ export default function GridderForm() {
       backgroundColor: '#000000',
     });
     setKeywords([]);
+    setTitle('');
     setSelectedCellId(null);
     setError('');
     setExportUrl(null);
@@ -459,6 +495,9 @@ export default function GridderForm() {
             );
           })}
         </div>
+        {title && step !== 'setup' && (
+          <span className="text-xs text-muted truncate max-w-[200px] hidden sm:inline">{title}</span>
+        )}
         {step !== 'setup' && (
           <button
             onClick={handleReset}
@@ -504,7 +543,7 @@ export default function GridderForm() {
             onStartFresh={handleStartFresh}
             isLoading={isLoading}
           />
-          <GridHistory />
+          <GridHistory onRestore={handleRestoreHistory} />
         </>
       )}
 

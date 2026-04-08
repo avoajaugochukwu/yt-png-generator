@@ -22,6 +22,8 @@ interface ComposeRequest {
   gap: number;
   borderRadius: number;
   backgroundColor: string;
+  title?: string;
+  keywords?: string[];
 }
 
 const WIDTH = 1920;
@@ -30,7 +32,7 @@ const HEIGHT = 1080;
 export async function POST(request: NextRequest) {
   try {
     const body: ComposeRequest = await request.json();
-    const { template, cells, gap, borderRadius, backgroundColor } = body;
+    const { template, cells, gap, borderRadius, backgroundColor, title, keywords } = body;
 
     const canvas = createCanvas(WIDTH, HEIGHT);
     const ctx = canvas.getContext('2d');
@@ -111,7 +113,7 @@ export async function POST(request: NextRequest) {
     const base64 = Buffer.from(buffer).toString('base64');
 
     // Save to history (fire-and-forget, don't block the response)
-    saveToHistory(base64, template, cells.length, gap, borderRadius, backgroundColor).catch(
+    saveToHistory(base64, template, cells.length, gap, borderRadius, backgroundColor, title, keywords).catch(
       (err) => console.error('[compose] History save failed:', err),
     );
 
@@ -132,6 +134,8 @@ async function saveToHistory(
   gap: number,
   borderRadius: number,
   backgroundColor: string,
+  title?: string,
+  keywords?: string[],
 ) {
   // Generate a small thumbnail (320x180) for the history preview
   const thumbCanvas = createCanvas(320, 180);
@@ -157,8 +161,10 @@ async function saveToHistory(
   const entry: HistoryEntry = {
     id: crypto.randomUUID(),
     date: new Date().toISOString(),
+    title: title || 'Untitled',
     user: { name: userName, email: userEmail },
-    template: { cols: template.cols, rows: template.rows },
+    keywords: keywords || [],
+    template: { cols: template.cols, rows: template.rows, colWeights: template.colWeights },
     cellCount,
     gap,
     borderRadius,
