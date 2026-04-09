@@ -32,11 +32,22 @@ export default function GridHistory({ onRestore }: GridHistoryProps) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     fetch('/api/gridder/history')
-      .then((r) => r.json())
-      .then(setHistory)
-      .catch(() => {})
+      .then((r) => {
+        console.log('[GridHistory] fetch status:', r.status);
+        return r.json();
+      })
+      .then((data) => {
+        console.log('[GridHistory] loaded entries:', data?.length ?? 0, data);
+        setHistory(data);
+      })
+      .catch((err) => {
+        console.error('[GridHistory] fetch error:', err);
+        setError(err.message);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -54,8 +65,6 @@ export default function GridHistory({ onRestore }: GridHistoryProps) {
     );
   }
 
-  if (history.length === 0) return null;
-
   return (
     <div className="rounded-xl border border-card-border bg-card overflow-hidden">
       <div className="flex items-center gap-2 px-5 py-3 border-b border-card-border bg-surface">
@@ -65,6 +74,14 @@ export default function GridHistory({ onRestore }: GridHistoryProps) {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">Recent Exports</h3>
         <span className="ml-auto text-xs text-muted-light">{history.length} total</span>
       </div>
+      {error && (
+        <div className="px-5 py-3 text-xs text-danger">Error: {error}</div>
+      )}
+      {history.length === 0 ? (
+        <div className="px-5 py-6 text-center text-sm text-muted-light">
+          No exports yet. Your exported grids will appear here.
+        </div>
+      ) : (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-4">
         {history.map((entry) => (
           <button
@@ -105,6 +122,7 @@ export default function GridHistory({ onRestore }: GridHistoryProps) {
           </button>
         ))}
       </div>
+      )}
     </div>
   );
 }
