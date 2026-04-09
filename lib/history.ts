@@ -1,4 +1,4 @@
-import { db, migrated } from './db';
+import { getDb } from './db';
 
 export interface HistoryEntry {
   id: string;
@@ -18,7 +18,7 @@ export interface HistoryEntry {
 }
 
 export async function readHistory(): Promise<HistoryEntry[]> {
-  await migrated;
+  const db = await getDb();
   console.log('[history] readHistory start');
   const result = await db.execute('SELECT * FROM gridder_history ORDER BY date DESC LIMIT 200');
   const entries = result.rows.map((row) => ({
@@ -46,7 +46,7 @@ export async function readHistory(): Promise<HistoryEntry[]> {
 }
 
 export async function appendHistory(entry: HistoryEntry): Promise<void> {
-  await migrated;
+  const db = await getDb();
   console.log('[history] appendHistory start, title:', entry.title);
   await db.execute({
     sql: `INSERT INTO gridder_history (id, date, title, user_name, user_email, keywords, template_cols, template_rows, col_weights, cell_count, gap, border_radius, background_color, thumbnail)
