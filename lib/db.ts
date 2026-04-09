@@ -15,8 +15,8 @@ function getClient(): Client {
 
 async function ensureMigrated(client: Client) {
   if (_migrated) return;
-  await client.execute(`
-    CREATE TABLE IF NOT EXISTS gridder_history (
+  await client.batch([
+    `CREATE TABLE IF NOT EXISTS gridder_history (
       id TEXT PRIMARY KEY,
       date TEXT NOT NULL,
       title TEXT NOT NULL DEFAULT 'Untitled',
@@ -31,8 +31,22 @@ async function ensureMigrated(client: Client) {
       border_radius INTEGER NOT NULL DEFAULT 0,
       background_color TEXT NOT NULL DEFAULT '#000000',
       thumbnail TEXT
-    )
-  `);
+    )`,
+    `CREATE TABLE IF NOT EXISTS gridder_history_cells (
+      id TEXT PRIMARY KEY,
+      history_id TEXT NOT NULL REFERENCES gridder_history(id) ON DELETE CASCADE,
+      cell_row INTEGER NOT NULL,
+      cell_col INTEGER NOT NULL,
+      col_span INTEGER NOT NULL DEFAULT 1,
+      row_span INTEGER NOT NULL DEFAULT 1,
+      image_base64 TEXT NOT NULL,
+      crop_offset_x REAL NOT NULL DEFAULT 0.5,
+      crop_offset_y REAL NOT NULL DEFAULT 0.5,
+      zoom REAL NOT NULL DEFAULT 1
+    )`,
+    // Clean up entries older than 7 days
+    `DELETE FROM gridder_history WHERE date < datetime('now', '-7 days')`,
+  ], 'write');
   _migrated = true;
 }
 

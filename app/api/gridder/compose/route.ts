@@ -3,7 +3,7 @@ import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { cellRect } from '@/lib/grid-templates';
 import type { GridTemplate } from '@/lib/types';
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
-import { appendHistory, type HistoryEntry } from '@/lib/history';
+import { appendHistory, type HistoryEntry, type HistoryCellData } from '@/lib/history';
 
 interface CellInput {
   row: number;
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     const base64 = Buffer.from(buffer).toString('base64');
 
     // Save to history (fire-and-forget, don't block the response)
-    saveToHistory(base64, template, cells.length, gap, borderRadius, backgroundColor, title, keywords).catch(
+    saveToHistory(base64, template, cells, gap, borderRadius, backgroundColor, title, keywords).catch(
       (err) => console.error('[compose] History save failed:', err),
     );
 
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
 async function saveToHistory(
   fullBase64: string,
   template: ComposeRequest['template'],
-  cellCount: number,
+  cells: CellInput[],
   gap: number,
   borderRadius: number,
   backgroundColor: string,
@@ -165,12 +165,23 @@ async function saveToHistory(
     user: { name: userName, email: userEmail },
     keywords: keywords || [],
     template: { cols: template.cols, rows: template.rows, colWeights: template.colWeights },
-    cellCount,
+    cellCount: cells.length,
     gap,
     borderRadius,
     backgroundColor,
     thumbnail: `data:image/png;base64,${thumbnail}`,
   };
 
-  await appendHistory(entry);
+  const cellData: HistoryCellData[] = cells.map((c) => ({
+    row: c.row,
+    col: c.col,
+    colSpan: c.colSpan ?? 1,
+    rowSpan: c.rowSpan ?? 1,
+    imageBase64: c.imageBase64,
+    cropOffsetX: c.cropOffsetX,
+    cropOffsetY: c.cropOffsetY,
+    zoom: c.zoom,
+  }));
+
+  await appendHistory(entry, cellData);
 }

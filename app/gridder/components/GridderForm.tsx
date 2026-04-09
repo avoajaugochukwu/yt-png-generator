@@ -312,20 +312,48 @@ export default function GridderForm() {
     gap: number;
     borderRadius: number;
     backgroundColor: string;
+    cells?: { row: number; col: number; colSpan: number; rowSpan: number; imageBase64: string; cropOffsetX: number; cropOffsetY: number; zoom: number }[];
   }) {
-    const tpl: GridTemplate = {
-      id: `${entry.template.cols}x${entry.template.rows}`,
-      label: `${entry.template.cols} x ${entry.template.rows}`,
-      cols: entry.template.cols,
-      rows: entry.template.rows,
-      colWeights: entry.template.colWeights,
-    };
+    const count = entry.keywords.length;
+    let tpl: GridTemplate;
+
+    // If saved template fits the keywords, use it; otherwise pick a better one
+    if (count > 0 && entry.template.cols * entry.template.rows < count) {
+      const found = BUILT_IN_TEMPLATES.find(
+        (t) => t.cols * t.rows >= count && t.cols * t.rows <= count + 2,
+      );
+      if (found) {
+        tpl = found;
+      } else if (count > 10) {
+        tpl = { id: `${Math.ceil(count / 2)}x2`, label: `${Math.ceil(count / 2)} x 2`, cols: Math.ceil(count / 2), rows: 2 };
+      } else {
+        tpl = { id: `${entry.template.cols}x${entry.template.rows}`, label: `${entry.template.cols} x ${entry.template.rows}`, cols: entry.template.cols, rows: entry.template.rows, colWeights: entry.template.colWeights };
+      }
+    } else {
+      tpl = { id: `${entry.template.cols}x${entry.template.rows}`, label: `${entry.template.cols} x ${entry.template.rows}`, cols: entry.template.cols, rows: entry.template.rows, colWeights: entry.template.colWeights };
+    }
 
     setTitle(entry.title);
     setKeywords(entry.keywords);
+
+    const newCells = createCells(tpl, entry.keywords);
+
+    // Restore images from saved cells by matching row/col position
+    if (entry.cells?.length) {
+      for (const saved of entry.cells) {
+        const match = newCells.find((c) => c.row === saved.row && c.col === saved.col);
+        if (match) {
+          match.imageUrl = saved.imageBase64;
+          match.cropOffsetX = saved.cropOffsetX;
+          match.cropOffsetY = saved.cropOffsetY;
+          match.zoom = saved.zoom;
+        }
+      }
+    }
+
     setGridderState({
       template: tpl,
-      cells: createCells(tpl, entry.keywords),
+      cells: newCells,
       gap: entry.gap,
       borderRadius: entry.borderRadius,
       backgroundColor: entry.backgroundColor,

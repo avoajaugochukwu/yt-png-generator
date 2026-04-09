@@ -3,6 +3,17 @@
 import { useState, useEffect } from 'react';
 import { relativeTime } from '@/lib/relative-time';
 
+interface HistoryCellData {
+  row: number;
+  col: number;
+  colSpan: number;
+  rowSpan: number;
+  imageBase64: string;
+  cropOffsetX: number;
+  cropOffsetY: number;
+  zoom: number;
+}
+
 interface HistoryEntry {
   id: string;
   date: string;
@@ -25,31 +36,46 @@ interface GridHistoryProps {
     gap: number;
     borderRadius: number;
     backgroundColor: string;
+    cells?: HistoryCellData[];
   }) => void;
 }
 
 export default function GridHistory({ onRestore }: GridHistoryProps) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const [restoringId, setRestoringId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/gridder/history')
-      .then((r) => {
-        console.log('[GridHistory] fetch status:', r.status);
-        return r.json();
-      })
-      .then((data) => {
-        console.log('[GridHistory] loaded entries:', data?.length ?? 0, data);
-        setHistory(data);
-      })
-      .catch((err) => {
-        console.error('[GridHistory] fetch error:', err);
-        setError(err.message);
-      })
+      .then((r) => r.json())
+      .then(setHistory)
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleRestore(entry: HistoryEntry) {
+    setRestoringId(entry.id);
+    try {
+      const res = await fetch(`/api/gridder/history/${entry.id}`);
+      if (!res.ok) throw new Error('Failed to load session');
+      const full = await res.json();
+      onRestore({
+        title: full.title,
+        keywords: full.keywords,
+        template: full.template,
+        gap: full.gap,
+        borderRadius: full.borderRadius,
+        backgroundColor: full.backgroundColor,
+        cells: full.cells,
+      });
+    } catch (err) {
+      // Fallback: restore without images
+      onRestore(entry);
+    } finally {
+      setRestoringId(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -86,16 +112,25 @@ export default function GridHistory({ onRestore }: GridHistoryProps) {
         {history.map((entry) => (
           <button
             key={entry.id}
-            onClick={() => onRestore(entry)}
-            className="group rounded-lg border border-card-border bg-surface overflow-hidden hover:border-accent/40 hover:shadow-md hover:shadow-accent-glow/10 transition-all text-left"
+            onClick={() => handleRestore(entry)}
+            disabled={restoringId !== null}
+            className="group rounded-lg border border-card-border bg-surface overflow-hidden hover:border-accent/40 hover:shadow-md hover:shadow-accent-glow/10 transition-all text-left disabled:opacity-60"
           >
             {entry.thumbnail && (
-              <div className="aspect-video bg-black">
+              <div className="aspect-video bg-black relative">
                 <img
                   src={entry.thumbnail}
                   alt={entry.title}
                   className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
                 />
+                {restoringId === entry.id && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                    <svg className="h-5 w-5 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  </div>
+                )}
               </div>
             )}
             <div className="p-2 space-y-1">
