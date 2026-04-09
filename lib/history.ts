@@ -27,19 +27,44 @@ async function ensureDir() {
   await fs.mkdir(DATA_DIR, { recursive: true });
 }
 
+async function checkDataDir() {
+  try {
+    const stat = await fs.stat(DATA_DIR);
+    console.log(`[history] DATA_DIR="${DATA_DIR}" exists=${true} isDir=${stat.isDirectory()}`);
+  } catch {
+    console.log(`[history] DATA_DIR="${DATA_DIR}" exists=false`);
+  }
+  try {
+    const stat = await fs.stat(HISTORY_FILE);
+    console.log(`[history] HISTORY_FILE="${HISTORY_FILE}" exists=${true} size=${stat.size}`);
+  } catch {
+    console.log(`[history] HISTORY_FILE="${HISTORY_FILE}" exists=false`);
+  }
+}
+
 export async function readHistory(): Promise<HistoryEntry[]> {
+  console.log('[history] readHistory start');
+  await checkDataDir();
   try {
     const raw = await fs.readFile(HISTORY_FILE, 'utf-8');
-    return JSON.parse(raw);
-  } catch {
+    const entries = JSON.parse(raw);
+    console.log(`[history] readHistory done, ${entries.length} entries`);
+    return entries;
+  } catch (err) {
+    console.log('[history] readHistory no file or parse error:', err);
     return [];
   }
 }
 
 export async function appendHistory(entry: HistoryEntry): Promise<void> {
+  console.log('[history] appendHistory start, title:', entry.title);
+  await checkDataDir();
   await ensureDir();
+  console.log('[history] ensureDir done');
   const history = await readHistory();
   history.unshift(entry);
   if (history.length > MAX_ENTRIES) history.length = MAX_ENTRIES;
   await fs.writeFile(HISTORY_FILE, JSON.stringify(history), 'utf-8');
+  console.log(`[history] appendHistory done, wrote ${history.length} entries`);
+  await checkDataDir();
 }
