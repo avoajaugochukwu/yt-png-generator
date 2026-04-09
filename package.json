@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@kinde-oss/kinde-auth-nextjs": "^2.11.0",
+    "@libsql/client": "^0.17.2",
     "@napi-rs/canvas": "^0.1.97",
     "archiver": "^7.0.1",
     "next": "16.2.1",

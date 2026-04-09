@@ -1,13 +1,8 @@
-import fs from 'fs/promises';
-import path from 'path';
-
-const DATA_DIR = process.env.DATA_DIR || '/data';
-const HISTORY_FILE = path.join(DATA_DIR, 'gridder-history.json');
-const MAX_ENTRIES = 200;
+import { db, migrated } from './db';
 
 export interface HistoryEntry {
   id: string;
-  date: string; // ISO string
+  date: string;
   title: string;
   user: {
     name: string | null;
@@ -19,52 +14,59 @@ export interface HistoryEntry {
   gap: number;
   borderRadius: number;
   backgroundColor: string;
-  /** Small base64 thumbnail for preview */
   thumbnail: string | null;
 }
 
-async function ensureDir() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-}
-
-async function checkDataDir() {
-  try {
-    const stat = await fs.stat(DATA_DIR);
-    console.log(`[history] DATA_DIR="${DATA_DIR}" exists=${true} isDir=${stat.isDirectory()}`);
-  } catch {
-    console.log(`[history] DATA_DIR="${DATA_DIR}" exists=false`);
-  }
-  try {
-    const stat = await fs.stat(HISTORY_FILE);
-    console.log(`[history] HISTORY_FILE="${HISTORY_FILE}" exists=${true} size=${stat.size}`);
-  } catch {
-    console.log(`[history] HISTORY_FILE="${HISTORY_FILE}" exists=false`);
-  }
-}
-
 export async function readHistory(): Promise<HistoryEntry[]> {
+  await migrated;
   console.log('[history] readHistory start');
-  await checkDataDir();
-  try {
-    const raw = await fs.readFile(HISTORY_FILE, 'utf-8');
-    const entries = JSON.parse(raw);
-    console.log(`[history] readHistory done, ${entries.length} entries`);
-    return entries;
-  } catch (err) {
-    console.log('[history] readHistory no file or parse error:', err);
-    return [];
-  }
+  const result = await db.execute('SELECT * FROM gridder_history ORDER BY date DESC LIMIT 200');
+  const entries = result.rows.map((row) => ({
+    id: row.id as string,
+    date: row.date as string,
+    title: row.title as string,
+    user: {
+      name: (row.user_name as string) || null,
+      email: (row.user_email as string) || null,
+    },
+    keywords: JSON.parse((row.keywords as string) || '[]'),
+    template: {
+      cols: row.template_cols as number,
+      rows: row.template_rows as number,
+      colWeights: row.col_weights ? JSON.parse(row.col_weights as string) : undefined,
+    },
+    cellCount: row.cell_count as number,
+    gap: row.gap as number,
+    borderRadius: row.border_radius as number,
+    backgroundColor: row.background_color as string,
+    thumbnail: (row.thumbnail as string) || null,
+  }));
+  console.log(`[history] readHistory done, ${entries.length} entries`);
+  return entries;
 }
 
 export async function appendHistory(entry: HistoryEntry): Promise<void> {
+  await migrated;
   console.log('[history] appendHistory start, title:', entry.title);
-  await checkDataDir();
-  await ensureDir();
-  console.log('[history] ensureDir done');
-  const history = await readHistory();
-  history.unshift(entry);
-  if (history.length > MAX_ENTRIES) history.length = MAX_ENTRIES;
-  await fs.writeFile(HISTORY_FILE, JSON.stringify(history), 'utf-8');
-  console.log(`[history] appendHistory done, wrote ${history.length} entries`);
-  await checkDataDir();
+  await db.execute({
+    sql: `INSERT INTO gridder_history (id, date, title, user_name, user_email, keywords, template_cols, template_rows, col_weights, cell_count, gap, border_radius, background_color, thumbnail)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      entry.id,
+      entry.date,
+      entry.title,
+      entry.user.name,
+      entry.user.email,
+      JSON.stringify(entry.keywords),
+      entry.template.cols,
+      entry.template.rows,
+      entry.template.colWeights ? JSON.stringify(entry.template.colWeights) : null,
+      entry.cellCount,
+      entry.gap,
+      entry.borderRadius,
+      entry.backgroundColor,
+      entry.thumbnail,
+    ],
+  });
+  console.log('[history] appendHistory done');
 }
