@@ -23,10 +23,15 @@ export const BUILT_IN_TEMPLATES: GridTemplate[] = [
   { id: '4x2', label: '4 x 2', cols: 4, rows: 2 },
   { id: '5x2', label: '5 x 2', cols: 5, rows: 2 },
   { id: '3x1', label: '3 x 1', cols: 3, rows: 1 },
+  { id: '3x1-skew', label: '3 x 1 Skewed', cols: 3, rows: 1, colWeights: [7, 3, 3] },
   { id: '4x1', label: '4 x 1', cols: 4, rows: 1 },
+  { id: '4x1-skew', label: '4 x 1 Skewed', cols: 4, rows: 1, colWeights: [7, 3, 3, 3] },
   { id: '5x1', label: '5 x 1', cols: 5, rows: 1 },
+  { id: '5x1-skew', label: '5 x 1 Skewed', cols: 5, rows: 1, colWeights: [7, 3, 3, 3, 3] },
   { id: '6x1', label: '6 x 1', cols: 6, rows: 1 },
+  { id: '6x1-skew', label: '6 x 1 Skewed', cols: 6, rows: 1, colWeights: [7, 3, 3, 3, 3, 3] },
   { id: '7x1', label: '7 x 1', cols: 7, rows: 1 },
+  { id: '7x1-skew', label: '7 x 1 Skewed', cols: 7, rows: 1, colWeights: [7, 3, 3, 3, 3, 3, 3] },
 ];
 
 export function createCells(template: GridTemplate, keywords: string[] = []): GridCellData[] {
