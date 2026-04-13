@@ -23,6 +23,10 @@ export const BUILT_IN_TEMPLATES: GridTemplate[] = [
   { id: '4x2', label: '4 x 2', cols: 4, rows: 2 },
   { id: '5x2', label: '5 x 2', cols: 5, rows: 2 },
   { id: '3x1', label: '3 x 1', cols: 3, rows: 1 },
+  { id: '4x1', label: '4 x 1', cols: 4, rows: 1 },
+  { id: '5x1', label: '5 x 1', cols: 5, rows: 1 },
+  { id: '6x1', label: '6 x 1', cols: 6, rows: 1 },
+  { id: '7x1', label: '7 x 1', cols: 7, rows: 1 },
 ];
 
 export function createCells(template: GridTemplate, keywords: string[] = []): GridCellData[] {
