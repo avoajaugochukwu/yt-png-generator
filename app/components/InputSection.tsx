@@ -7,6 +7,8 @@ interface InputSectionProps {
   onScriptChange: (text: string) => void;
   audioFile: File | null;
   onAudioFileChange: (file: File | null) => void;
+  audioUrl: string;
+  onAudioUrlChange: (url: string) => void;
   isLoading: boolean;
 }
 
@@ -15,6 +17,8 @@ export default function InputSection({
   onScriptChange,
   audioFile,
   onAudioFileChange,
+  audioUrl,
+  onAudioUrlChange,
   isLoading,
 }: InputSectionProps) {
   const scriptFileRef = useRef<HTMLInputElement>(null);
@@ -30,6 +34,7 @@ export default function InputSection({
   function handleAudioFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
     onAudioFileChange(file);
+    if (file) onAudioUrlChange('');
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -40,6 +45,7 @@ export default function InputSection({
       file.text().then(onScriptChange);
     } else if (/\.(mp3|wav|m4a)$/i.test(file.name)) {
       onAudioFileChange(file);
+      onAudioUrlChange('');
     }
   }
 
@@ -124,6 +130,25 @@ export default function InputSection({
             className="hidden"
           />
         </button>
+      </div>
+
+      {/* Audio URL (S3 / public https) */}
+      <div>
+        <label className="block text-xs font-medium text-muted mb-1.5">
+          Or paste audio URL (S3 / public https)
+        </label>
+        <input
+          type="url"
+          inputMode="url"
+          placeholder="https://bucket.s3.amazonaws.com/episode.mp3"
+          value={audioUrl}
+          onChange={(e) => {
+            onAudioUrlChange(e.target.value);
+            if (e.target.value && audioFile) onAudioFileChange(null);
+          }}
+          disabled={isLoading || !!audioFile}
+          className="w-full rounded-xl border border-card-border bg-surface px-4 py-2.5 text-sm text-foreground placeholder:text-muted-light focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent disabled:opacity-50 transition-shadow"
+        />
       </div>
     </div>
   );

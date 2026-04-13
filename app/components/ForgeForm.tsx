@@ -87,6 +87,7 @@ export default function ForgeForm() {
   const [step, setStep] = useState<AppStep>('input');
   const [scriptText, setScriptText] = useState('');
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioUrl, setAudioUrl] = useState('');
   const [elements, setElements] = useState<VisualElement[] | null>(null);
   const [customization, setCustomization] = useState<CustomizationOptions>({
     textColor: '#000000',
@@ -156,9 +157,14 @@ export default function ForgeForm() {
       let segments;
 
       // Transcribe audio first if provided and no script text
-      if (audioFile && !script.trim()) {
+      const trimmedAudioUrl = audioUrl.trim();
+      if ((audioFile || trimmedAudioUrl) && !script.trim()) {
         const formData = new FormData();
-        formData.append('audio', audioFile);
+        if (audioFile) {
+          formData.append('audio', audioFile);
+        } else {
+          formData.append('audioUrl', trimmedAudioUrl);
+        }
 
         const transcribeRes = await fetch('/api/transcribe', {
           method: 'POST',
@@ -207,7 +213,7 @@ export default function ForgeForm() {
     } finally {
       setIsLoading(false);
     }
-  }, [scriptText, customInstructions, audioFile]);
+  }, [scriptText, customInstructions, audioFile, audioUrl]);
 
   const handleGenerate = useCallback(async () => {
     if (!elements) return;
@@ -322,6 +328,8 @@ export default function ForgeForm() {
         onScriptChange={setScriptText}
         audioFile={audioFile}
         onAudioFileChange={setAudioFile}
+        audioUrl={audioUrl}
+        onAudioUrlChange={setAudioUrl}
         isLoading={isLoading}
       />
 
@@ -385,7 +393,7 @@ export default function ForgeForm() {
       <div className="flex items-center gap-3">
         <GenerateButton
           step={step}
-          hasScript={scriptText.trim().length > 0 || !!audioFile}
+          hasScript={scriptText.trim().length > 0 || !!audioFile || audioUrl.trim().length > 0}
           hasElements={!!elements?.length}
           isLoading={isLoading}
           onAnalyze={handleAnalyze}
