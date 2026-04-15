@@ -22,7 +22,7 @@ Rules:
 - Listicle heading text should be short: "#N" followed by the item name (2-5 words max).
 - Points of interest should be brief phrases (2-6 words).
 - If timestamped segments are provided, match each element to the closest segment's start/end times (in seconds).
-- The main-title ALWAYS has a timestamp: set it to 23 (so it appears 23 seconds into the video), with timestampEnd around 26 seconds (or just before the start of the first listicle-heading, whichever is smaller). This rule applies even when no segments are provided.
+- The main-title ALWAYS has a timestamp: set it to 5 (so it appears 5 seconds into the video), with timestampEnd around 8 seconds (or just before the start of the first listicle-heading, whichever is smaller). This rule applies even when no segments are provided.
 - For all other element types, if no timestamps are available, set timestamp and timestampEnd to null.
 - Generate a unique id for each element (use format "el-01", "el-02", etc.).
 - Order elements chronologically as they appear in the script.
@@ -38,8 +38,8 @@ Return JSON in this exact format:
       "id": "el-01",
       "type": "main-title",
       "text": "10 LUXURY PLANTS",
-      "timestamp": 23,
-      "timestampEnd": 26
+      "timestamp": 5,
+      "timestampEnd": 8
     },
     {
       "id": "el-02",
@@ -105,8 +105,8 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Invalid AI response format' }, { status: 500 });
     }
 
-    // main-title is always anchored at 23s so it never lands right on the cold open.
-    const MAIN_TITLE_START = 23;
+    // main-title is always anchored at 5s so it comes in early.
+    const MAIN_TITLE_START = 5;
     const firstHeading = parsed.elements.find(
       (e) => e.type === 'listicle-heading' && typeof e.timestamp === 'number',
     );
