@@ -33,6 +33,26 @@ const SIZE_CONFIGS: Record<VisualElement['type'], SizeConfig> = {
   'subscribe': { maxWidth: 1000, fontSize: 96 },
 };
 
+function drawHeart(
+  ctx: SKRSContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  color: string,
+) {
+  const topLobeY = y + h * 0.3;
+  ctx.beginPath();
+  ctx.moveTo(x + w / 2, topLobeY);
+  ctx.bezierCurveTo(x + w / 2, y, x, y, x, topLobeY);
+  ctx.bezierCurveTo(x, y + h * 0.55, x + w / 2, y + h * 0.8, x + w / 2, y + h);
+  ctx.bezierCurveTo(x + w / 2, y + h * 0.8, x + w, y + h * 0.55, x + w, topLobeY);
+  ctx.bezierCurveTo(x + w, y, x + w / 2, y, x + w / 2, topLobeY);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
 function wrapText(
   ctx: SKRSContext2D,
   text: string,
@@ -71,9 +91,9 @@ export function generatePng(
   const bgColor = isSubscribe ? '#FF0000' : options.backgroundColor;
   const textColor = isSubscribe ? '#FFFFFF' : options.textColor;
 
-  // Heart emoji dimensions for subscribe type
-  const heartText = '\u2764';
-  const heartFontSpec = `${config.fontSize}px serif`;
+  // Heart shape dimensions for subscribe type (drawn as a canvas path — no emoji font required)
+  const heartSize = Math.round(config.fontSize * 0.85);
+  const heartBoxHeight = heartSize * 0.9;
   const heartGap = Math.round(config.fontSize * 0.4);
 
   // First pass: measure text to determine canvas dimensions
@@ -84,12 +104,7 @@ export function generatePng(
   const availableWidth = config.maxWidth - PADDING * 2;
   const uppercaseText = element.text.toUpperCase();
 
-  let heartWidth = 0;
-  if (isSubscribe) {
-    measureCtx.font = heartFontSpec;
-    heartWidth = measureCtx.measureText(heartText).width + heartGap;
-    measureCtx.font = fontSpec;
-  }
+  const heartWidth = isSubscribe ? heartSize + heartGap : 0;
 
   const lines = wrapText(measureCtx, uppercaseText, availableWidth - heartWidth);
 
@@ -125,22 +140,17 @@ export function generatePng(
   const firstLineY = centerY - ((lines.length - 1) * lineHeight) / 2;
 
   if (isSubscribe) {
-    // Draw heart + text centered together
+    // Draw heart path + text centered together
     ctx.textAlign = 'left';
     for (let i = 0; i < lines.length; i++) {
       const lineY = firstLineY + i * lineHeight;
-      // Measure this line to center heart+text block
       ctx.font = fontSpec;
       const textW = ctx.measureText(lines[i]).width;
       const totalW = heartWidth + textW;
       const blockX = (config.maxWidth - totalW) / 2;
 
-      // Draw heart emoji in white
-      ctx.font = heartFontSpec;
-      ctx.fillStyle = textColor;
-      ctx.fillText(heartText, blockX, lineY);
+      drawHeart(ctx, blockX, lineY - heartBoxHeight / 2, heartSize, heartBoxHeight, textColor);
 
-      // Draw text
       ctx.font = fontSpec;
       ctx.fillStyle = textColor;
       ctx.fillText(lines[i], blockX + heartWidth, lineY);
