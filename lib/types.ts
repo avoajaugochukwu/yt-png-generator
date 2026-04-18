@@ -23,8 +23,18 @@ export interface AnalyzeRequest {
   segments?: TranscriptSegment[];
 }
 
+export type ScriptType =
+  | 'listicle'
+  | 'tutorial'
+  | 'explainer'
+  | 'essay'
+  | 'narrative'
+  | 'commentary'
+  | 'other';
+
 export interface AnalyzeResponse {
   suggestedTitle?: string;
+  scriptType: ScriptType;
   elements: VisualElement[];
 }
 
