@@ -92,7 +92,13 @@ export default function DownloadArea({ zipUrl, elements, scriptText, timeline }:
                         : 'bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400'
                   }`}
                 >
-                  {preview.type === 'main-title' ? 'Title' : preview.type === 'listicle-heading' ? 'Heading' : 'POI'}
+                  {preview.type === 'main-title'
+                    ? 'Title'
+                    : preview.type === 'listicle-heading'
+                      ? 'Heading'
+                      : preview.type === 'subscribe'
+                        ? 'Subscribe'
+                        : 'Point of Interest'}
                 </span>
                 <span className="font-mono text-xs text-muted-light">
                   {preview.filename}

@@ -373,7 +373,13 @@ export default function ForgeForm() {
                         : 'bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400'
                   }`}
                 >
-                  {el.type === 'main-title' ? 'Title' : el.type === 'listicle-heading' ? 'Heading' : 'POI'}
+                  {el.type === 'main-title'
+                    ? 'Title'
+                    : el.type === 'listicle-heading'
+                      ? 'Heading'
+                      : el.type === 'subscribe'
+                        ? 'Subscribe'
+                        : 'Point of Interest'}
                 </span>
                 <span className="text-foreground truncate">
                   {el.text}
