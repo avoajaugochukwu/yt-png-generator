@@ -1,290 +1,125 @@
-import { execFile as execFileCb } from 'child_process';
-import { promisify } from 'util';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as os from 'os';
-import openai from '@/lib/openai';
 import type { TranscribeResponse, TranscriptSegment } from '@/lib/types';
 
-const execFile = promisify(execFileCb);
+const WHISPER_BASE_URL = (
+  process.env.WHISPER_TRANSCRIBE_URL || 'https://avoajaugochukwu--whisper-transcribe-web.modal.run'
+).replace(/\/+$/, '');
 
-const FFMPEG = process.env.FFMPEG_PATH || '/usr/bin/ffmpeg';
-const FFPROBE = process.env.FFPROBE_PATH || '/usr/bin/ffprobe';
-const MAX_CHUNK_SIZE = 24 * 1024 * 1024; // 24MB safety margin
-const MAX_CONCURRENT = 3;
+const POLL_INTERVAL_MS = 2000;
+const MAX_POLL_MS = 55 * 60 * 1000;
+const PAUSE_THRESHOLD_SEC = 0.7;
+const MAX_SEGMENT_DURATION_SEC = 8;
 
-const VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.webm', '.mov', '.avi']);
-
-interface SilenceInterval {
+interface WordTimestamp {
+  word: string;
   start: number;
   end: number;
 }
 
-interface ChunkInfo {
-  path: string;
-  startTime: number;
+interface JobSubmittedResponse {
+  job_id: string;
 }
 
-interface ChunkResult {
-  segments: TranscriptSegment[];
-  text: string;
-  startTime: number;
+interface JobStatusResponse {
+  job_id: string;
+  status: string;
+  result?: { words: WordTimestamp[] } | null;
+  error?: string | null;
 }
 
-async function extractAudio(videoPath: string, tempDir: string): Promise<string> {
-  const outputPath = path.join(tempDir, 'extracted.mp3');
-  await execFile(FFMPEG, [
-    '-i', videoPath,
-    '-vn',
-    '-c:a', 'libmp3lame',
-    '-b:a', '128k',
-    '-y',
-    outputPath,
-  ]);
-  return outputPath;
-}
+async function submitJob(buffer: Buffer, filename: string, contentType: string): Promise<string> {
+  const form = new FormData();
+  const blob = new Blob([new Uint8Array(buffer)], { type: contentType || 'application/octet-stream' });
+  form.append('file', blob, filename);
 
-async function getDuration(inputPath: string): Promise<number> {
-  const { stdout } = await execFile(FFPROBE, [
-    '-v', 'error',
-    '-show_entries', 'format=duration',
-    '-of', 'csv=p=0',
-    inputPath,
-  ]);
-  return parseFloat(stdout.trim());
-}
-
-async function detectSilences(inputPath: string): Promise<SilenceInterval[]> {
-  try {
-    await execFile(FFMPEG, [
-      '-i', inputPath,
-      '-af', 'silencedetect=noise=-30dB:d=0.5',
-      '-f', 'null',
-      '-',
-    ], { maxBuffer: 10 * 1024 * 1024 });
-    return [];
-  } catch (err: unknown) {
-    // ffmpeg writes detection info to stderr and may exit with non-zero
-    const stderr = (err as { stderr?: string }).stderr || '';
-    const starts: number[] = [];
-    const ends: number[] = [];
-
-    for (const match of stderr.matchAll(/silence_start:\s*([\d.]+)/g)) {
-      starts.push(parseFloat(match[1]));
-    }
-    for (const match of stderr.matchAll(/silence_end:\s*([\d.]+)/g)) {
-      ends.push(parseFloat(match[1]));
-    }
-
-    const silences: SilenceInterval[] = [];
-    for (let i = 0; i < starts.length; i++) {
-      silences.push({
-        start: starts[i],
-        end: i < ends.length ? ends[i] : starts[i] + 0.5,
-      });
-    }
-    return silences;
+  const res = await fetch(`${WHISPER_BASE_URL}/v1/jobs`, { method: 'POST', body: form });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to submit transcription job (${res.status}): ${text}`);
   }
+  const data = (await res.json()) as JobSubmittedResponse;
+  if (!data.job_id) throw new Error('Transcription job response missing job_id');
+  return data.job_id;
 }
 
-function computeSplitPoints(
-  silences: SilenceInterval[],
-  duration: number,
-  fileSize: number
-): number[] {
-  const bytesPerSecond = fileSize / duration;
-  const maxChunkDuration = MAX_CHUNK_SIZE / bytesPerSecond;
-  const splitPoints: number[] = [];
-  let currentStart = 0;
+async function pollJob(jobId: string): Promise<WordTimestamp[]> {
+  const deadline = Date.now() + MAX_POLL_MS;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 
-  while (currentStart + maxChunkDuration < duration) {
-    const targetSplit = currentStart + maxChunkDuration;
-
-    // Find the nearest silence midpoint to the target split
-    let bestSplit = targetSplit;
-    let bestDistance = Infinity;
-
-    for (const s of silences) {
-      const mid = (s.start + s.end) / 2;
-      // Only consider silences within the current chunk window
-      if (mid <= currentStart) continue;
-      if (mid >= duration) break;
-
-      const distance = Math.abs(mid - targetSplit);
-      // Accept silence points within 30% of the chunk duration from the target
-      if (distance < bestDistance && distance < maxChunkDuration * 0.3) {
-        bestDistance = distance;
-        bestSplit = mid;
-      }
+    const res = await fetch(`${WHISPER_BASE_URL}/v1/jobs/${encodeURIComponent(jobId)}`);
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Failed to poll job ${jobId} (${res.status}): ${text}`);
     }
+    const data = (await res.json()) as JobStatusResponse;
+    const status = (data.status || '').toLowerCase();
 
-    splitPoints.push(bestSplit);
-    currentStart = bestSplit;
-  }
-
-  return splitPoints;
-}
-
-async function splitAudio(
-  inputPath: string,
-  splitPoints: number[],
-  duration: number,
-  tempDir: string
-): Promise<ChunkInfo[]> {
-  const boundaries = [0, ...splitPoints, duration];
-  const chunks: ChunkInfo[] = [];
-
-  for (let i = 0; i < boundaries.length - 1; i++) {
-    const start = boundaries[i];
-    const end = boundaries[i + 1];
-    const ext = path.extname(inputPath) || '.mp3';
-    const chunkPath = path.join(tempDir, `chunk_${i}${ext}`);
-
-    await execFile(FFMPEG, [
-      '-i', inputPath,
-      '-ss', String(start),
-      '-to', String(end),
-      '-c', 'copy',
-      '-y',
-      chunkPath,
-    ]);
-
-    // Verify chunk size; re-encode if too large
-    const stat = await fs.stat(chunkPath);
-    if (stat.size > 25 * 1024 * 1024) {
-      const reEncodedPath = path.join(tempDir, `chunk_${i}_re.mp3`);
-      await execFile(FFMPEG, [
-        '-i', inputPath,
-        '-ss', String(start),
-        '-to', String(end),
-        '-c:a', 'libmp3lame',
-        '-b:a', '128k',
-        '-y',
-        reEncodedPath,
-      ]);
-      await fs.unlink(chunkPath);
-      chunks.push({ path: reEncodedPath, startTime: start });
-    } else {
-      chunks.push({ path: chunkPath, startTime: start });
+    if (status === 'completed' || status === 'succeeded' || status === 'success' || status === 'done') {
+      if (!data.result) throw new Error('Transcription finished without a result');
+      return data.result.words ?? [];
+    }
+    if (status === 'failed' || status === 'error' || status === 'errored') {
+      throw new Error(data.error || `Transcription job ${jobId} failed`);
     }
   }
-
-  return chunks;
+  throw new Error(`Transcription job ${jobId} timed out after ${MAX_POLL_MS / 1000}s`);
 }
 
-async function transcribeChunk(
-  chunkPath: string
-): Promise<{ segments: TranscriptSegment[]; text: string }> {
-  const buffer = await fs.readFile(chunkPath);
-  const ext = path.extname(chunkPath).slice(1) || 'mp3';
-  const file = new File([buffer], `chunk.${ext}`, {
-    type: ext === 'wav' ? 'audio/wav' : ext === 'm4a' ? 'audio/m4a' : 'audio/mpeg',
-  });
-
-  const transcription = await openai.audio.transcriptions.create({
-    file,
-    model: 'whisper-1',
-    response_format: 'verbose_json',
-    timestamp_granularities: ['segment'],
-  });
-
-  const segments = (transcription.segments || []).map((seg) => ({
-    start: seg.start,
-    end: seg.end,
-    text: seg.text.trim(),
-  }));
-
-  return { segments, text: transcription.text };
+function tidy(text: string): string {
+  return text.replace(/\s+([,.!?;:])/g, '$1').trim();
 }
 
-function mergeResults(chunkResults: ChunkResult[]): TranscribeResponse {
-  const allSegments: TranscriptSegment[] = [];
-  const allTexts: string[] = [];
+function wordsToSegments(words: WordTimestamp[]): TranscriptSegment[] {
+  if (!words.length) return [];
 
-  for (const result of chunkResults) {
-    for (const seg of result.segments) {
-      allSegments.push({
-        start: seg.start + result.startTime,
-        end: seg.end + result.startTime,
-        text: seg.text,
-      });
-    }
-    allTexts.push(result.text);
-  }
+  const segments: TranscriptSegment[] = [];
+  let current: WordTimestamp[] = [];
+  let segmentStart = words[0].start;
 
-  return {
-    segments: allSegments,
-    fullText: allTexts.join(' '),
+  const flush = () => {
+    if (!current.length) return;
+    segments.push({
+      start: segmentStart,
+      end: current[current.length - 1].end,
+      text: tidy(current.map((w) => w.word).join(' ')),
+    });
+    current = [];
   };
-}
 
-async function runWithConcurrency<T, R>(
-  items: T[],
-  fn: (item: T) => Promise<R>,
-  concurrency: number
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let index = 0;
-
-  async function worker() {
-    while (index < items.length) {
-      const i = index++;
-      results[i] = await fn(items[i]);
+  for (const word of words) {
+    if (!current.length) {
+      segmentStart = word.start;
+      current.push(word);
+      continue;
     }
+    const prev = current[current.length - 1];
+    const pause = word.start - prev.end;
+    const spanIfAdded = word.end - segmentStart;
+    if (pause > PAUSE_THRESHOLD_SEC || spanIfAdded > MAX_SEGMENT_DURATION_SEC) {
+      flush();
+      segmentStart = word.start;
+    }
+    current.push(word);
   }
-
-  const workers = Array.from(
-    { length: Math.min(concurrency, items.length) },
-    () => worker()
-  );
-  await Promise.all(workers);
-  return results;
+  flush();
+  return segments;
 }
 
 export async function transcribeLargeAudio(
   fileBuffer: Buffer,
   fileName: string,
-  _mimeType: string
+  mimeType: string,
 ): Promise<TranscribeResponse> {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'yt-transcribe-'));
+  const sizeMb = (fileBuffer.length / 1024 / 1024).toFixed(1);
+  console.log(`[transcribe] Submitting ${fileName} (${sizeMb}MB) to ${WHISPER_BASE_URL}`);
 
-  try {
-    const ext = path.extname(fileName) || '.mp3';
-    const rawPath = path.join(tempDir, `input${ext}`);
-    await fs.writeFile(rawPath, fileBuffer);
+  const jobId = await submitJob(fileBuffer, fileName, mimeType);
+  console.log(`[transcribe] Job ${jobId} submitted, polling every ${POLL_INTERVAL_MS}ms`);
 
-    // If the input is a video file, extract audio first
-    let inputPath = rawPath;
-    if (VIDEO_EXTENSIONS.has(ext.toLowerCase())) {
-      console.log(`[audio-chunker] Video detected, extracting audio from ${fileName}`);
-      inputPath = await extractAudio(rawPath, tempDir);
-    }
+  const words = await pollJob(jobId);
+  console.log(`[transcribe] Job ${jobId} completed: ${words.length} words`);
 
-    const stat = await fs.stat(inputPath);
-    const duration = await getDuration(inputPath);
-    const fileSize = stat.size;
-
-    console.log(`[audio-chunker] File: ${fileName}, size: ${(fileSize / 1024 / 1024).toFixed(1)}MB, duration: ${duration.toFixed(1)}s`);
-
-    const silences = await detectSilences(inputPath);
-    console.log(`[audio-chunker] Found ${silences.length} silence intervals`);
-
-    const splitPoints = computeSplitPoints(silences, duration, fileSize);
-    console.log(`[audio-chunker] Splitting into ${splitPoints.length + 1} chunks at: ${splitPoints.map(s => s.toFixed(1)).join(', ')}s`);
-
-    const chunks = await splitAudio(inputPath, splitPoints, duration, tempDir);
-
-    const chunkResults = await runWithConcurrency(
-      chunks,
-      async (chunk) => {
-        const result = await transcribeChunk(chunk.path);
-        return { ...result, startTime: chunk.startTime };
-      },
-      MAX_CONCURRENT
-    );
-
-    return mergeResults(chunkResults);
-  } finally {
-    await fs.rm(tempDir, { recursive: true, force: true });
-  }
+  const segments = wordsToSegments(words);
+  const fullText = tidy(words.map((w) => w.word).join(' '));
+  return { segments, fullText };
 }

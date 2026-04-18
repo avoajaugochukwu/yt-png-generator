@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# yt-png-generator
 
-## Getting Started
+Next.js app that turns a YouTube script (plus optional audio/video) into timestamped PNG overlay assets for video editing. A companion **Gridder** tool composes image grids.
 
-First, run the development server:
+## Getting started
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Pipeline
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Input** — the user provides a script, or uploads an audio/video file, or pastes an audio URL.
+2. **Transcription** (`POST /api/transcribe`) — if audio is provided, the raw buffer is forwarded to the [Modal Whisper service](https://avoajaugochukwu--whisper-transcribe-web.modal.run/docs). The service is called via its async job endpoints (`POST /v1/jobs` + poll `GET /v1/jobs/{job_id}`). Word-level timestamps are returned and grouped into segments (pause > 0.7s or segment duration > 8s starts a new segment). The response shape is `{ segments: [{start, end, text}], fullText }`.
+3. **Analysis** (`POST /api/analyze`) — GPT-4o receives the script and the segments and emits `VisualElement`s (main-title, listicle-heading, point-of-interest, subscribe) each with `timestamp` / `timestampEnd`. Post-processing anchors the main-title at 5s and enforces a **4-second** minimum gap between consecutive timestamped elements (without pushing a POI past the next heading).
+4. **Generation** (`POST /api/generate`) — renders each element to a PNG via `@napi-rs/canvas` and returns a timeline JSON that downstream editors can consume.
 
-## Learn More
+## Environment variables
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | Required — used by `/api/analyze` (GPT-4o). | — |
+| `WHISPER_TRANSCRIBE_URL` | Base URL of the Modal Whisper service. | `https://avoajaugochukwu--whisper-transcribe-web.modal.run` |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+No local ffmpeg/ffprobe install is required — audio decoding happens inside the Modal service.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project layout
 
-## Deploy on Vercel
+- `app/` — Next.js App Router entry (`api/` routes + UI pages).
+- `lib/audio-chunker.ts` — Modal Whisper client (submit job + poll + word→segment grouping).
+- `lib/types.ts` — shared request/response types.
+- `app/gridder/` — Gridder tool (image-grid composer).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deploy
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Any host that supports Next.js 16 and Node 20+ works. Make sure `WHISPER_TRANSCRIBE_URL` points to a reachable Modal deployment and `OPENAI_API_KEY` is set.

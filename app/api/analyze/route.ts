@@ -26,7 +26,7 @@ Rules:
 - For all other element types, if no timestamps are available, set timestamp and timestampEnd to null.
 - Generate a unique id for each element (use format "el-01", "el-02", etc.).
 - Order elements chronologically as they appear in the script.
-- Enforce a minimum 20-second gap between any two consecutive elements that have timestamps (e.g., a listicle-heading and its following point-of-interest must be at least 20s apart, and the same applies between consecutive points-of-interest). If the script places them closer together, push the later element's timestamp forward so the gap is at least 20 seconds — but never push it past the next listicle-heading's timestamp. A heading and its first POI must NEVER share the same timestamp.
+- Enforce a minimum 4-second gap between any two consecutive elements that have timestamps (e.g., a listicle-heading and its following point-of-interest must be at least 4s apart, and the same applies between consecutive points-of-interest). If the script places them closer together, push the later element's timestamp forward so the gap is at least 4 seconds — but never push it past the next listicle-heading's timestamp. A heading and its first POI must NEVER share the same timestamp.
 
 Also generate a short "suggestedTitle" (3-8 words) that summarizes the video topic — this will be used as a session label. It should be descriptive and human-readable (e.g., "10 Luxury Plants You Need", "Best Budget Cameras 2024").
 
@@ -118,9 +118,9 @@ export async function POST(request: NextRequest) {
       el.timestampEnd = Math.max(el.timestamp + 0.1, desiredEnd);
     }
 
-    // Enforce minimum 20s gap between consecutive timestamped elements.
+    // Enforce minimum 4s gap between consecutive timestamped elements.
     // Headings anchor the timeline — never push a POI past the next heading.
-    const MIN_GAP = 20;
+    const MIN_GAP = 4;
     const nextHeadingAt: (number | null)[] = parsed.elements.map(() => null);
     let upcoming: number | null = null;
     for (let i = parsed.elements.length - 1; i >= 0; i--) {
