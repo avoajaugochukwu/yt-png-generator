@@ -146,6 +146,8 @@ export default function ThumbnailEditor({
                 fontSize: 'clamp(24px, 5vw, 54px)',
                 lineHeight: 1,
                 marginBottom: `${spec.text.lineGap}px`,
+                WebkitTextStroke: `2px ${spec.text.strokeColor}`,
+                paintOrder: 'stroke fill',
               }}
             >
               {text.top.toUpperCase() || 'TOP LINE PREVIEW'}
@@ -155,8 +157,11 @@ export default function ThumbnailEditor({
               style={{
                 color: spec.text.bottomColor,
                 fontFamily: `"${spec.text.bottomFont}", "Inter", sans-serif`,
-                fontSize: 'clamp(24px, 5vw, 54px)',
+                fontSize: `clamp(${28}px, ${5 * spec.text.bottomSizeScale}vw, ${Math.round(54 * spec.text.bottomSizeScale)}px)`,
                 lineHeight: 1,
+                letterSpacing: '0.04em',
+                WebkitTextStroke: `2px ${spec.text.strokeColor}`,
+                paintOrder: 'stroke fill',
               }}
             >
               {text.bottom.toUpperCase() || 'BOTTOM LINE PREVIEW'}

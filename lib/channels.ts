@@ -11,6 +11,13 @@ export interface ThumbnailTextStyle {
   barColor: string;
   topFont: string;
   bottomFont: string;
+  /** Outline / stroke around both lines. Color + width measured at 1920×1080 canvas. */
+  strokeColor: string;
+  strokeWidth: number;
+  /** Bottom line font-size multiplier vs the top line. 1 = same, 1.18 = ~18% bigger. */
+  bottomSizeScale: number;
+  /** Extra letter-spacing in px applied to the bottom line only. */
+  bottomLetterSpacing: number;
 }
 
 export interface ThumbnailSpec {
@@ -82,10 +89,14 @@ const GARDEN_LISTICLE_THUMBNAIL: ThumbnailSpec = {
   text: {
     lineGap: 6,
     topColor: '#FFFFFF',
-    bottomColor: '#FACC15',
+    bottomColor: '#FFCC00',
     barColor: 'rgba(0, 0, 0, 0.7)',
     topFont: 'Open Sauce Sans',
     bottomFont: 'Anton',
+    strokeColor: '#000000',
+    strokeWidth: 6,
+    bottomSizeScale: 1.18,
+    bottomLetterSpacing: 6,
   },
 };
 

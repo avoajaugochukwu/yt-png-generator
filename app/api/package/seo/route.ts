@@ -97,19 +97,9 @@ B) titles — exactly 5 title options, each using a DIFFERENT psychological prin
 
 Rank titles by predicted CTR (best first). Each title's primaryText + secondaryText should pair into a complete thumbnail-text (top hook + bottom payoff), like "THEY LOVE 115° HEAT" / "MASSIVE FRUIT HARVEST!".
 
-C) tags — 15-20 YouTube SEO tags optimized for SEARCH INTENT.
-   IMPORTANT: Do not just list words spoken in the script. Instead, generate keywords based on what a user would type into a search bar to find this video.
-
-   Use this 3-Step Hierarchy:
-   1. THE CORE HOOK (1-3 tags): The primary target keyword and its most common search variation. (e.g., if the video is about drought plants, use "best drought tolerant plants", "low water landscaping")
-   2. SEARCH INTENT & SYNONYMS (5-8 tags): Use "How-to" phrases, problem-solving queries, and synonyms that are NOT in the script. (e.g., "how to garden with no rain", "xeriscaping for beginners", "desert gardening tips")
-   3. BROAD CATEGORY (3-5 tags): High-level niche terms to help the algorithm categorize the video. (e.g., "gardening", "permaculture", "homesteading")
-
-   Rules:
-   - Move from Most Specific to Most Broad.
-   - Use multi-word phrases (long-tail) instead of single words.
-   - Lowercase only, no hashtags, no quotes.
-   - Think: "What is the problem this video solves?" and tag the problem.
+C) tags — 15-20 relevant YouTube tags for SEO.
+   - Mix of broad and specific tags
+   - Include topic keywords, related topics, and long-tail variations
 
 === OUTPUT FORMAT (JSON) ===
 {
@@ -166,20 +156,9 @@ C) tags — 15-20 YouTube SEO tags optimized for SEARCH INTENT.
       estimatedCTR: t.estimatedCTR === 'high' ? 'high' : 'medium',
     }));
 
-    const rawTags = (Array.isArray(parsed.tags) ? parsed.tags : [])
-      .map((t) => (typeof t === 'string' ? t.trim().toLowerCase().replace(/^#+/, '') : ''))
-      .filter((t) => t.length > 0);
-
-    // Lead with the top title as an exact-match tag so YouTube picks it up first.
-    const primaryTitleTag = parsed.titles[0]?.title
-      ?.toLowerCase()
-      .replace(/[^a-z0-9 ]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    const orderedTags = primaryTitleTag ? [primaryTitleTag, ...rawTags] : rawTags;
-
     const seenTags = new Set<string>();
-    parsed.tags = orderedTags
+    parsed.tags = (Array.isArray(parsed.tags) ? parsed.tags : [])
+      .map((t) => (typeof t === 'string' ? t.trim().toLowerCase().replace(/^#+/, '') : ''))
       .filter((t) => {
         if (!t || seenTags.has(t)) return false;
         seenTags.add(t);

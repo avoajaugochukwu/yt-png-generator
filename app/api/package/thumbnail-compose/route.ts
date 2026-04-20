@@ -34,7 +34,7 @@ const WIDTH = 1920;
 const HEIGHT = 1080;
 const TEXT_FONT_SIZE = 144;
 const TEXT_PADDING_X = 48;
-const TEXT_PADDING_Y = 16;
+const TEXT_PADDING_Y = 10;
 
 function fitFontSize(
   ctx: SKRSContext2D,
@@ -60,13 +60,17 @@ function drawTextOverlay(
 ) {
   const topFont = style.topFont || 'Anton';
   const bottomFont = style.bottomFont || 'Anton';
+  const bottomScale = style.bottomSizeScale || 1;
+  const bottomLetterSpacing = style.bottomLetterSpacing || 0;
+  const strokeColor = style.strokeColor || '#000000';
+  const strokeWidth = style.strokeWidth || 0;
   const maxLineWidth = WIDTH - TEXT_PADDING_X * 2;
 
   const topText = top.toUpperCase();
   const bottomText = bottom.toUpperCase();
 
   const topSize = fitFontSize(ctx, topText, topFont, TEXT_FONT_SIZE, maxLineWidth);
-  const bottomSize = fitFontSize(ctx, bottomText, bottomFont, TEXT_FONT_SIZE, maxLineWidth);
+  const bottomSize = fitFontSize(ctx, bottomText, bottomFont, Math.round(TEXT_FONT_SIZE * bottomScale), maxLineWidth);
 
   const lineGap = style.lineGap;
   const barHeight = TEXT_PADDING_Y * 2 + topSize + lineGap + bottomSize;
@@ -77,16 +81,35 @@ function drawTextOverlay(
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
+  ctx.lineJoin = 'round';
+  ctx.miterLimit = 2;
 
-  ctx.fillStyle = style.topColor;
+  // Top line — stroke first so the fill renders on top of the outline
   ctx.font = `900 ${topSize}px "${topFont}"`;
+  (ctx as unknown as { letterSpacing: string }).letterSpacing = '0px';
   const topBaselineY = barY + TEXT_PADDING_Y + topSize * 0.86;
+  if (strokeWidth > 0) {
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = strokeWidth;
+    ctx.strokeText(topText, WIDTH / 2, topBaselineY);
+  }
+  ctx.fillStyle = style.topColor;
   ctx.fillText(topText, WIDTH / 2, topBaselineY);
 
-  ctx.fillStyle = style.bottomColor;
+  // Bottom line
   ctx.font = `${bottomSize}px "${bottomFont}"`;
+  (ctx as unknown as { letterSpacing: string }).letterSpacing = `${bottomLetterSpacing}px`;
   const bottomBaselineY = topBaselineY + (topSize - topSize * 0.86) + lineGap + bottomSize * 0.86;
+  if (strokeWidth > 0) {
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = strokeWidth;
+    ctx.strokeText(bottomText, WIDTH / 2, bottomBaselineY);
+  }
+  ctx.fillStyle = style.bottomColor;
   ctx.fillText(bottomText, WIDTH / 2, bottomBaselineY);
+
+  // Reset for any future caller of this ctx
+  (ctx as unknown as { letterSpacing: string }).letterSpacing = '0px';
 }
 
 export async function POST(request: NextRequest) {
