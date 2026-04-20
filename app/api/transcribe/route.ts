@@ -146,6 +146,42 @@ async function fetchAudioFromYouTube(rawUrl: string): Promise<{ buffer: Buffer; 
   }
 }
 
+const YT_TRANSCRIPT_API_URL = (
+  process.env.YT_TRANSCRIPT_API_URL || 'https://youtube-transcript-production-18aa.up.railway.app/api'
+).replace(/\/+$/, '');
+
+async function fetchYouTubeTranscript(rawUrl: string): Promise<{ fullText: string; segments: [] }> {
+  if (!isYouTubeUrl(rawUrl)) {
+    throw new Error('Provide a youtube.com or youtu.be URL');
+  }
+
+  const res = await fetch(`${YT_TRANSCRIPT_API_URL}/transcript`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: rawUrl }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(
+      data.message || data.error || `YouTube transcript service failed (${res.status})`,
+    );
+  }
+  const data: unknown = await res.json();
+  const fullText =
+    typeof data === 'string'
+      ? data
+      : typeof data === 'object' && data !== null
+        ? (data as Record<string, unknown>).transcript ||
+          (data as Record<string, unknown>).text ||
+          (data as Record<string, unknown>).fullText ||
+          ''
+        : '';
+  if (typeof fullText !== 'string' || !fullText.trim()) {
+    throw new Error('YouTube transcript service returned no text — the video may have no captions');
+  }
+  return { fullText: fullText.trim(), segments: [] };
+}
+
 async function fetchAudioFromUrl(rawUrl: string): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
   let url: URL;
   try {
@@ -189,6 +225,12 @@ export async function POST(request: NextRequest) {
 
     const youtubeUrl = formData.get('youtubeUrl');
     if (typeof youtubeUrl === 'string' && youtubeUrl.trim()) {
+      // Fast path: hit the captions-based transcript service directly. Free,
+      // skips yt-dlp + Whisper, dodges the YouTube bot check on Railway IPs.
+      // Only works when the video actually has captions (auto or human).
+      if (useFast) {
+        return Response.json(await fetchYouTubeTranscript(youtubeUrl.trim()));
+      }
       const { buffer, filename, contentType } = await fetchAudioFromYouTube(youtubeUrl.trim());
       return Response.json(await run(buffer, filename, contentType));
     }

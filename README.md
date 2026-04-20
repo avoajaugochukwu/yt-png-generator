@@ -30,8 +30,20 @@ Open [http://localhost:3000](http://localhost:3000).
 | `OPENAI_WHISPER_MODEL` | OpenAI Whisper model used by `/api/transcribe?mode=fast` (cheap path for `/gridder` and `/package`). | `whisper-1` |
 | `FFMPEG_PATH` | Path to the `ffmpeg` binary (used to re-encode audio to opus 24 kbps mono before sending to OpenAI Whisper, keeping it under the 25 MB cap). | `ffmpeg` |
 | `YT_DLP_PATH` | Path to the `yt-dlp` binary (used by `/api/transcribe` when a YouTube URL is pasted). The production Dockerfile installs it on `PATH`. | `yt-dlp` |
+| `YT_DLP_COOKIES_B64` | Base64-encoded `cookies.txt` from a logged-in browser session. Required when YouTube's bot check starts hitting Railway IPs (error: "Sign in to confirm you're not a bot"). See section below. | — |
 
 No local ffmpeg/ffprobe install is required — audio decoding happens inside the Modal service.
+
+### Bypassing YouTube's "Sign in to confirm you're not a bot"
+
+YouTube increasingly blocks server IPs (Railway included). The `/api/transcribe` route already passes mobile-client extractor args + a Pixel-8 user-agent, which works for most videos. When that's not enough, supply a cookies file:
+
+1. In a browser logged into your YouTube account, install **Get cookies.txt LOCALLY** (or any equivalent) and export `youtube.com` cookies as `cookies.txt`.
+2. `base64 -i cookies.txt | pbcopy` (macOS) — or `base64 cookies.txt -w 0` on Linux.
+3. Paste the value into Railway as the `YT_DLP_COOKIES_B64` env var.
+4. Redeploy. The route will write the decoded cookies to a temp file per request and pass `--cookies` to yt-dlp.
+
+Cookies expire (typically every few weeks). When the bot-check error returns, refresh the cookies and update the env var.
 
 ## Package wizard
 
