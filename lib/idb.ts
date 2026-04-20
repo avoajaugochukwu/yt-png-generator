@@ -144,6 +144,7 @@ export interface PackageSession {
   channel: string;
   scriptText: string;
   audioUrl: string;
+  youtubeUrl: string;
   customInstructions: string;
   scriptType: string | null;
   elements: unknown[] | null;

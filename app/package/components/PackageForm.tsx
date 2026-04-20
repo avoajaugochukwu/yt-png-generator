@@ -144,6 +144,7 @@ export default function PackageForm() {
   const [scriptText, setScriptText] = useState('');
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState('');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
   const [customInstructions, setCustomInstructions] = useState('');
   const [scriptType, setScriptType] = useState<ScriptType | null>(null);
   const [elements, setElements] = useState<VisualElement[] | null>(null);
@@ -181,6 +182,7 @@ export default function PackageForm() {
         setChannel((s.channel as Channel) || 'garden');
         setScriptText(s.scriptText || '');
         setAudioUrl(s.audioUrl || '');
+        setYoutubeUrl(s.youtubeUrl || '');
         setCustomInstructions(s.customInstructions || '');
         setScriptType((s.scriptType as ScriptType | null) ?? null);
         setElements(s.elements as VisualElement[] | null);
@@ -218,6 +220,7 @@ export default function PackageForm() {
       channel,
       scriptText,
       audioUrl,
+      youtubeUrl,
       customInstructions,
       scriptType,
       elements,
@@ -239,6 +242,7 @@ export default function PackageForm() {
     channel,
     scriptText,
     audioUrl,
+    youtubeUrl,
     customInstructions,
     scriptType,
     elements,
@@ -304,9 +308,12 @@ export default function PackageForm() {
       let script = scriptText;
       let segments;
       const trimmedAudioUrl = audioUrl.trim();
-      if ((audioFile || trimmedAudioUrl) && !script.trim()) {
+      const trimmedYoutubeUrl = youtubeUrl.trim();
+      const hasAudioInput = !!audioFile || !!trimmedAudioUrl || !!trimmedYoutubeUrl;
+      if (hasAudioInput && !script.trim()) {
         const formData = new FormData();
-        if (audioFile) formData.append('audio', audioFile);
+        if (trimmedYoutubeUrl) formData.append('youtubeUrl', trimmedYoutubeUrl);
+        else if (audioFile) formData.append('audio', audioFile);
         else formData.append('audioUrl', trimmedAudioUrl);
         const transcribeRes = await fetch('/api/transcribe', { method: 'POST', body: formData });
         if (!transcribeRes.ok) {
@@ -356,7 +363,7 @@ export default function PackageForm() {
     } finally {
       setIsLoading(false);
     }
-  }, [scriptText, audioFile, audioUrl, customInstructions, channel, channelConfig]);
+  }, [scriptText, audioFile, audioUrl, youtubeUrl, customInstructions, channel, channelConfig]);
 
   const handleGenerateOverlays = useCallback(async () => {
     if (!elements) return;
@@ -531,6 +538,7 @@ export default function PackageForm() {
     setScriptText('');
     setAudioFile(null);
     setAudioUrl('');
+    setYoutubeUrl('');
     setCustomInstructions('');
     setScriptType(null);
     setElements(null);
@@ -549,7 +557,11 @@ export default function PackageForm() {
     clearPackageSession().catch(() => {});
   }
 
-  const hasInput = scriptText.trim().length > 0 || !!audioFile || audioUrl.trim().length > 0;
+  const hasInput =
+    scriptText.trim().length > 0 ||
+    !!audioFile ||
+    audioUrl.trim().length > 0 ||
+    youtubeUrl.trim().length > 0;
 
   if (!mounted) return null;
 
@@ -590,6 +602,37 @@ export default function PackageForm() {
       {step === 'script' && (
         <>
           <ChannelPicker channel={channel} onChange={setChannel} />
+
+          <div className="rounded-xl border border-accent/30 bg-accent-light/40 p-4 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="youtube-url-input" className="block text-sm font-semibold text-foreground">
+                Paste YouTube URL
+              </label>
+              <span className="text-[11px] font-medium uppercase tracking-wider text-accent">
+                Recommended for published videos
+              </span>
+            </div>
+            <input
+              id="youtube-url-input"
+              type="url"
+              inputMode="url"
+              placeholder="https://www.youtube.com/watch?v=..."
+              value={youtubeUrl}
+              onChange={(e) => {
+                setYoutubeUrl(e.target.value);
+                if (e.target.value) {
+                  if (audioFile) setAudioFile(null);
+                  if (audioUrl) setAudioUrl('');
+                }
+              }}
+              disabled={isLoading || !!audioFile || audioUrl.trim().length > 0}
+              className="w-full rounded-lg border border-card-border bg-surface px-4 py-3 text-sm text-foreground placeholder:text-muted-light focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent disabled:opacity-50 transition-shadow"
+            />
+            <p className="text-xs text-muted-light">
+              Server runs yt-dlp on the URL and feeds the audio to Whisper. Use this when the video is already published.
+            </p>
+          </div>
+
           <InputSection
             scriptText={scriptText}
             onScriptChange={setScriptText}

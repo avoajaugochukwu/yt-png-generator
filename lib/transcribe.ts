@@ -105,7 +105,7 @@ function wordsToSegments(words: WordTimestamp[]): TranscriptSegment[] {
   return segments;
 }
 
-export async function transcribeLargeAudio(
+export async function transcribeAudio(
   fileBuffer: Buffer,
   fileName: string,
   mimeType: string,

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { transcribeLargeAudio } from '@/lib/audio-chunker';
+import { transcribeAudio } from '@/lib/transcribe';
 
 export const maxDuration = 3600;
 
@@ -29,6 +29,60 @@ const EXT_TO_MIME: Record<string, string> = {
 };
 
 const MAX_URL_BYTES = 2 * 1024 * 1024 * 1024;
+const YOUTUBE_HOSTS = new Set([
+  'youtube.com',
+  'www.youtube.com',
+  'm.youtube.com',
+  'youtu.be',
+  'music.youtube.com',
+]);
+
+function isYouTubeUrl(raw: string): boolean {
+  try {
+    const host = new URL(raw).hostname.toLowerCase();
+    return YOUTUBE_HOSTS.has(host);
+  } catch {
+    return false;
+  }
+}
+
+async function fetchAudioFromYouTube(rawUrl: string): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
+  const base = process.env.YT_AUDIO_SERVICE_URL?.replace(/\/+$/, '');
+  if (!base) {
+    throw new Error('YT_AUDIO_SERVICE_URL is not configured — deploy services/yt-dlp and set the env var');
+  }
+  if (!isYouTubeUrl(rawUrl)) {
+    throw new Error('Provide a youtube.com or youtu.be URL');
+  }
+
+  const apiKey = process.env.YT_AUDIO_SERVICE_KEY;
+  const res = await fetch(`${base}/audio`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    },
+    body: JSON.stringify({ url: rawUrl }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`yt-dlp service failed (${res.status}): ${text || res.statusText}`);
+  }
+
+  const arrayBuffer = await res.arrayBuffer();
+  if (arrayBuffer.byteLength > MAX_URL_BYTES) {
+    throw new Error('Downloaded YouTube audio is too large');
+  }
+
+  const headerType = res.headers.get('content-type')?.split(';')[0]?.trim() ?? 'audio/mp4';
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  const filename = match?.[1] ?? 'youtube.m4a';
+  const contentType = ALLOWED_TYPES.has(headerType) ? headerType : 'audio/mp4';
+
+  return { buffer: Buffer.from(arrayBuffer), filename, contentType };
+}
 
 async function fetchAudioFromUrl(rawUrl: string): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
   let url: URL;
@@ -67,11 +121,18 @@ async function fetchAudioFromUrl(rawUrl: string): Promise<{ buffer: Buffer; file
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const audioUrl = formData.get('audioUrl');
 
+    const youtubeUrl = formData.get('youtubeUrl');
+    if (typeof youtubeUrl === 'string' && youtubeUrl.trim()) {
+      const { buffer, filename, contentType } = await fetchAudioFromYouTube(youtubeUrl.trim());
+      const result = await transcribeAudio(buffer, filename, contentType);
+      return Response.json(result);
+    }
+
+    const audioUrl = formData.get('audioUrl');
     if (typeof audioUrl === 'string' && audioUrl.trim()) {
       const { buffer, filename, contentType } = await fetchAudioFromUrl(audioUrl.trim());
-      const result = await transcribeLargeAudio(buffer, filename, contentType);
+      const result = await transcribeAudio(buffer, filename, contentType);
       return Response.json(result);
     }
 
@@ -88,7 +149,7 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await audioFile.arrayBuffer());
-    const result = await transcribeLargeAudio(buffer, audioFile.name, audioFile.type);
+    const result = await transcribeAudio(buffer, audioFile.name, audioFile.type);
     return Response.json(result);
   } catch (error) {
     console.error('[/api/transcribe]', error);
