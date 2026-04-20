@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { transcribeAudio } from '@/lib/transcribe';
+import { transcribeAudio, transcribeAudioOpenAI } from '@/lib/transcribe';
 
 export const maxDuration = 3600;
 
@@ -168,19 +168,20 @@ async function fetchAudioFromUrl(rawUrl: string): Promise<{ buffer: Buffer; file
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
+    const useFast = formData.get('mode') === 'fast';
+    const run = (buf: Buffer, name: string, type: string) =>
+      useFast ? transcribeAudioOpenAI(buf, name) : transcribeAudio(buf, name, type);
 
     const youtubeUrl = formData.get('youtubeUrl');
     if (typeof youtubeUrl === 'string' && youtubeUrl.trim()) {
       const { buffer, filename, contentType } = await fetchAudioFromYouTube(youtubeUrl.trim());
-      const result = await transcribeAudio(buffer, filename, contentType);
-      return Response.json(result);
+      return Response.json(await run(buffer, filename, contentType));
     }
 
     const audioUrl = formData.get('audioUrl');
     if (typeof audioUrl === 'string' && audioUrl.trim()) {
       const { buffer, filename, contentType } = await fetchAudioFromUrl(audioUrl.trim());
-      const result = await transcribeAudio(buffer, filename, contentType);
-      return Response.json(result);
+      return Response.json(await run(buffer, filename, contentType));
     }
 
     const audioFile = formData.get('audio');
@@ -196,8 +197,7 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await audioFile.arrayBuffer());
-    const result = await transcribeAudio(buffer, audioFile.name, audioFile.type);
-    return Response.json(result);
+    return Response.json(await run(buffer, audioFile.name, audioFile.type));
   } catch (error) {
     console.error('[/api/transcribe]', error);
     const message = error instanceof Error ? error.message : 'Transcription failed';

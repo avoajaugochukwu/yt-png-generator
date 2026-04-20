@@ -189,6 +189,7 @@ export default function GridderForm() {
       // Transcribe
       const formData = new FormData();
       formData.append('audio', file);
+      formData.append('mode', 'fast');
       const transcribeRes = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData,

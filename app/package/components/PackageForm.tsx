@@ -315,6 +315,7 @@ export default function PackageForm() {
         if (trimmedYoutubeUrl) formData.append('youtubeUrl', trimmedYoutubeUrl);
         else if (audioFile) formData.append('audio', audioFile);
         else formData.append('audioUrl', trimmedAudioUrl);
+        formData.append('mode', 'fast');
         const transcribeRes = await fetch('/api/transcribe', { method: 'POST', body: formData });
         if (!transcribeRes.ok) {
           const data = await transcribeRes.json();

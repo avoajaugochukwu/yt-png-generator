@@ -13,7 +13,11 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Pipeline
 
 1. **Input** — the user provides a script, or uploads an audio/video file, or pastes an audio URL.
-2. **Transcription** (`POST /api/transcribe`) — if audio is provided, the raw buffer is forwarded to the [Modal Whisper service](https://avoajaugochukwu--whisper-transcribe-web.modal.run/docs). The service is called via its async job endpoints (`POST /v1/jobs` + poll `GET /v1/jobs/{job_id}`). Word-level timestamps are returned and grouped into segments (pause > 0.7s or segment duration > 8s starts a new segment). The response shape is `{ segments: [{start, end, text}], fullText }`.
+2. **Transcription** (`POST /api/transcribe`) — two modes selected via the `mode` form field:
+   - **`precise` (default — used by `/forge`)** — forwards the audio buffer to the [Modal Whisper service](https://avoajaugochukwu--whisper-transcribe-web.modal.run/docs) (async job pattern: `POST /v1/jobs` + poll `GET /v1/jobs/{job_id}`). Returns word-level timestamps grouped into segments (pause > 0.7 s or segment duration > 8 s). Best for PNG overlay placement which needs sub-second accuracy.
+   - **`fast` (used by `/gridder` and `/package`)** — re-encodes the audio to opus mono 16 kHz / 24 kbps via local `ffmpeg` (~10 MB / hour), then sends it to OpenAI's Whisper API (`whisper-1` by default) with `verbose_json`. Cheaper but only segment-level timestamps. Cannot exceed OpenAI's 25 MB upload cap — re-encoding usually stays well under it; we throw a clear error if it doesn't.
+
+   Either mode returns `{ segments: [{start, end, text}], fullText }`.
 3. **Analysis** (`POST /api/analyze`) — GPT-4o receives the script and the segments and emits `VisualElement`s (main-title, listicle-heading, point-of-interest, subscribe) each with `timestamp` / `timestampEnd`. Post-processing anchors the main-title at 5s and enforces a **4-second** minimum gap between consecutive timestamped elements (without pushing a POI past the next heading).
 4. **Generation** (`POST /api/generate`) — renders each element to a PNG via `@napi-rs/canvas` and returns a timeline JSON that downstream editors can consume.
 
@@ -22,7 +26,9 @@ Open [http://localhost:3000](http://localhost:3000).
 | Variable | Purpose | Default |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | Required — used by `/api/analyze` (GPT-4o). | — |
-| `WHISPER_TRANSCRIBE_URL` | Base URL of the Modal Whisper service. | `https://avoajaugochukwu--whisper-transcribe-web.modal.run` |
+| `WHISPER_TRANSCRIBE_URL` | Base URL of the Modal Whisper service (precise word-level timestamps, used by `/forge`). | `https://avoajaugochukwu--whisper-transcribe-web.modal.run` |
+| `OPENAI_WHISPER_MODEL` | OpenAI Whisper model used by `/api/transcribe?mode=fast` (cheap path for `/gridder` and `/package`). | `whisper-1` |
+| `FFMPEG_PATH` | Path to the `ffmpeg` binary (used to re-encode audio to opus 24 kbps mono before sending to OpenAI Whisper, keeping it under the 25 MB cap). | `ffmpeg` |
 | `YT_DLP_PATH` | Path to the `yt-dlp` binary (used by `/api/transcribe` when a YouTube URL is pasted). The production Dockerfile installs it on `PATH`. | `yt-dlp` |
 
 No local ffmpeg/ffprobe install is required — audio decoding happens inside the Modal service.
