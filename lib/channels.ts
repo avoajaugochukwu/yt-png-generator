@@ -75,7 +75,7 @@ const GARDEN_VOICE: VoiceProfile = {
 
 const GARDEN_LISTICLE_THUMBNAIL: ThumbnailSpec = {
   template: { id: '3x1', label: '3 x 1', cols: 3, rows: 1 },
-  gap: 8,
+  gap: 10,
   borderRadius: 0,
   backgroundColor: '#9CA3AF',
   imageCount: 3,
