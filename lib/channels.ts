@@ -89,7 +89,7 @@ const GARDEN_LISTICLE_THUMBNAIL: ThumbnailSpec = {
   text: {
     lineGap: 6,
     topColor: '#FFFFFF',
-    bottomColor: '#FFCC00',
+    bottomColor: '#FFFC00',
     barColor: 'rgba(0, 0, 0, 0.7)',
     topFont: 'Open Sauce Sans',
     bottomFont: 'Anton',
