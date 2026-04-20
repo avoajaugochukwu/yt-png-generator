@@ -1,9 +1,8 @@
 FROM node:22-slim AS base
 
-# ffmpeg + yt-dlp (used by /api/transcribe when the user pastes a YouTube URL)
+# ffmpeg — used by /api/transcribe to re-encode audio for OpenAI Whisper (fast mode)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg python3 python3-pip ca-certificates \
-    && pip3 install --no-cache-dir --break-system-packages yt-dlp \
+    && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

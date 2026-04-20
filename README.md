@@ -15,7 +15,9 @@ Open [http://localhost:3000](http://localhost:3000).
 1. **Input** — the user provides a script, or uploads an audio/video file, or pastes an audio URL.
 2. **Transcription** (`POST /api/transcribe`) — two modes selected via the `mode` form field:
    - **`precise` (default — used by `/forge`)** — forwards the audio buffer to the [Modal Whisper service](https://avoajaugochukwu--whisper-transcribe-web.modal.run/docs) (async job pattern: `POST /v1/jobs` + poll `GET /v1/jobs/{job_id}`). Returns word-level timestamps grouped into segments (pause > 0.7 s or segment duration > 8 s). Best for PNG overlay placement which needs sub-second accuracy.
-   - **`fast` (used by `/gridder` and `/package`)** — re-encodes the audio to opus mono 16 kHz / 24 kbps via local `ffmpeg` (~10 MB / hour), then sends it to OpenAI's Whisper API (`whisper-1` by default) with `verbose_json`. Cheaper but only segment-level timestamps. Cannot exceed OpenAI's 25 MB upload cap — re-encoding usually stays well under it; we throw a clear error if it doesn't.
+   - **`fast` (used by `/gridder` and `/package`)** — for **audio files / audio URLs**, re-encodes to opus mono 16 kHz / 24 kbps via local `ffmpeg` (~10 MB / hour) and sends to OpenAI's Whisper API (`whisper-1` by default) with `verbose_json`. Returns segment-level timestamps. Cannot exceed OpenAI's 25 MB upload cap.
+
+   **YouTube URLs** (any mode) bypass both Whisper paths entirely — the route hits `$YT_TRANSCRIPT_API_URL/transcript` (a captions-based service) and returns the script text directly. Free, near-instant, no audio download. Fails clearly when the video has no captions; the user should then upload the audio file instead.
 
    Either mode returns `{ segments: [{start, end, text}], fullText }`.
 3. **Analysis** (`POST /api/analyze`) — GPT-4o receives the script and the segments and emits `VisualElement`s (main-title, listicle-heading, point-of-interest, subscribe) each with `timestamp` / `timestampEnd`. Post-processing anchors the main-title at 5s and enforces a **4-second** minimum gap between consecutive timestamped elements (without pushing a POI past the next heading).
@@ -29,21 +31,9 @@ Open [http://localhost:3000](http://localhost:3000).
 | `WHISPER_TRANSCRIBE_URL` | Base URL of the Modal Whisper service (precise word-level timestamps, used by `/forge`). | `https://avoajaugochukwu--whisper-transcribe-web.modal.run` |
 | `OPENAI_WHISPER_MODEL` | OpenAI Whisper model used by `/api/transcribe?mode=fast` (cheap path for `/gridder` and `/package`). | `whisper-1` |
 | `FFMPEG_PATH` | Path to the `ffmpeg` binary (used to re-encode audio to opus 24 kbps mono before sending to OpenAI Whisper, keeping it under the 25 MB cap). | `ffmpeg` |
-| `YT_DLP_PATH` | Path to the `yt-dlp` binary (used by `/api/transcribe` when a YouTube URL is pasted). The production Dockerfile installs it on `PATH`. | `yt-dlp` |
-| `YT_DLP_COOKIES_B64` | Base64-encoded `cookies.txt` from a logged-in browser session. Required when YouTube's bot check starts hitting Railway IPs (error: "Sign in to confirm you're not a bot"). See section below. | — |
+| `YT_TRANSCRIPT_API_URL` | Captions-based YouTube transcript service. Used by `/api/transcribe` whenever a `youtubeUrl` is provided. | `https://youtube-transcript-production-18aa.up.railway.app/api` |
 
-No local ffmpeg/ffprobe install is required — audio decoding happens inside the Modal service.
-
-### Bypassing YouTube's "Sign in to confirm you're not a bot"
-
-YouTube increasingly blocks server IPs (Railway included). The `/api/transcribe` route already passes mobile-client extractor args + a Pixel-8 user-agent, which works for most videos. When that's not enough, supply a cookies file:
-
-1. In a browser logged into your YouTube account, install **Get cookies.txt LOCALLY** (or any equivalent) and export `youtube.com` cookies as `cookies.txt`.
-2. `base64 -i cookies.txt | pbcopy` (macOS) — or `base64 cookies.txt -w 0` on Linux.
-3. Paste the value into Railway as the `YT_DLP_COOKIES_B64` env var.
-4. Redeploy. The route will write the decoded cookies to a temp file per request and pass `--cookies` to yt-dlp.
-
-Cookies expire (typically every few weeks). When the bot-check error returns, refresh the cookies and update the env var.
+The Modal service handles its own audio decoding — no ffmpeg needed for the Modal path. The local `ffmpeg` install in the Dockerfile is only used by `/api/transcribe?mode=fast` to re-encode audio for OpenAI Whisper.
 
 ## Package wizard
 
@@ -53,7 +43,7 @@ Currently configured: **Garden / listicle** — 3×1 grid, gray gap, 6 px line-g
 
 Steps:
 
-1. **Script** — pick a channel, then provide the source. For already-published videos, paste the **YouTube URL** (the server shells out to `yt-dlp` — installed in the Dockerfile alongside ffmpeg — to grab bestaudio, then forwards it to Whisper). Otherwise: audio URL, audio file, or pasted script text.
+1. **Script** — pick a channel, then provide the source. For already-published videos, paste the **YouTube URL** (the server pulls the captions track via `$YT_TRANSCRIPT_API_URL`). Otherwise: audio URL, audio file, or pasted script text.
 2. **Overlays** — analyze + customize, then generate the same overlay PNG ZIP that `/` produces.
 3. **Titles + Thumbnail** — `POST /api/package/seo` seeds **5 CTR-optimized title options** (each using a different psychological principle: loss aversion, curiosity gap, FOMO, etc.) plus the per-cell **image keywords** plus **15-20 YouTube SEO tags** (broad topics + script subjects + long-tail discovery phrases). Each title carries its own `primaryText`/`secondaryText` pair; clicking a title pre-fills the thumbnail's top + bottom lines. You then fill the cells (Search opens Google Images, paste/upload), tweak text if needed, and `POST /api/package/thumbnail-compose` renders the final 1920×1080 thumbnail. Tags are shown in a copy-to-clipboard panel (comma-separated or one-per-line).
 

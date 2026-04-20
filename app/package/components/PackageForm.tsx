@@ -630,7 +630,7 @@ export default function PackageForm() {
               className="w-full rounded-lg border border-card-border bg-surface px-4 py-3 text-sm text-foreground placeholder:text-muted-light focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent disabled:opacity-50 transition-shadow"
             />
             <p className="text-xs text-muted-light">
-              Server runs yt-dlp on the URL and feeds the audio to Whisper. Use this when the video is already published.
+              Pulls the captions track for this video — free and instant. Requires the video to have captions (auto or human). Otherwise, upload the audio file below.
             </p>
           </div>
 
