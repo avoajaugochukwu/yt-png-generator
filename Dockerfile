@@ -1,7 +1,11 @@
 FROM node:22-slim AS base
 
-# Install ffmpeg (includes ffprobe)
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+# ffmpeg + yt-dlp (used by /api/transcribe when the user pastes a YouTube URL)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg python3 python3-pip ca-certificates \
+    && pip3 install --no-cache-dir --break-system-packages yt-dlp \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # --- Dependencies ---
 FROM base AS deps

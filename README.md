@@ -23,8 +23,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | --- | --- | --- |
 | `OPENAI_API_KEY` | Required — used by `/api/analyze` (GPT-4o). | — |
 | `WHISPER_TRANSCRIBE_URL` | Base URL of the Modal Whisper service. | `https://avoajaugochukwu--whisper-transcribe-web.modal.run` |
-| `YT_AUDIO_SERVICE_URL` | Base URL of the yt-dlp Railway service in `services/yt-dlp/`. Required to use the YouTube URL field in `/package`. | — |
-| `YT_AUDIO_SERVICE_KEY` | Bearer token shared with the yt-dlp service's `API_KEY`. | — |
+| `YT_DLP_PATH` | Path to the `yt-dlp` binary (used by `/api/transcribe` when a YouTube URL is pasted). The production Dockerfile installs it on `PATH`. | `yt-dlp` |
 
 No local ffmpeg/ffprobe install is required — audio decoding happens inside the Modal service.
 
@@ -36,7 +35,7 @@ Currently configured: **Garden / listicle** — 3×1 grid, gray gap, 6 px line-g
 
 Steps:
 
-1. **Script** — pick a channel, then provide the source. For already-published videos, paste the **YouTube URL** (server hits the `services/yt-dlp` Railway worker → m4a → Whisper). Otherwise: audio URL, audio file, or pasted script text.
+1. **Script** — pick a channel, then provide the source. For already-published videos, paste the **YouTube URL** (the server shells out to `yt-dlp` — installed in the Dockerfile alongside ffmpeg — to grab bestaudio, then forwards it to Whisper). Otherwise: audio URL, audio file, or pasted script text.
 2. **Overlays** — analyze + customize, then generate the same overlay PNG ZIP that `/` produces.
 3. **Titles + Thumbnail** — `POST /api/package/seo` seeds **5 CTR-optimized title options** (each using a different psychological principle: loss aversion, curiosity gap, FOMO, etc.) plus the per-cell **image keywords** plus **15-20 YouTube SEO tags** (broad topics + script subjects + long-tail discovery phrases). Each title carries its own `primaryText`/`secondaryText` pair; clicking a title pre-fills the thumbnail's top + bottom lines. You then fill the cells (Search opens Google Images, paste/upload), tweak text if needed, and `POST /api/package/thumbnail-compose` renders the final 1920×1080 thumbnail. Tags are shown in a copy-to-clipboard panel (comma-separated or one-per-line).
 
@@ -52,7 +51,6 @@ Adding a new channel = adding an entry to `CHANNELS` in `lib/channels.ts` with i
 - `lib/channels.ts` — channel registry (per-channel thumbnail specs).
 - `app/gridder/` — Gridder tool (image-grid composer).
 - `app/package/` — Package wizard (overlays + thumbnail per channel).
-- `services/yt-dlp/` — Standalone Railway/Docker service that wraps `yt-dlp`. The `/package` step-1 YouTube URL field calls this to grab bestaudio, then forwards the file to the Whisper service. See `services/yt-dlp/README.md` for deploy steps.
 
 ## Deploy
 

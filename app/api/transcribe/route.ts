@@ -1,4 +1,8 @@
 import { NextRequest } from 'next/server';
+import { spawn } from 'node:child_process';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { transcribeAudio } from '@/lib/transcribe';
 
 export const maxDuration = 3600;
@@ -46,42 +50,85 @@ function isYouTubeUrl(raw: string): boolean {
   }
 }
 
-async function fetchAudioFromYouTube(rawUrl: string): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
-  const base = process.env.YT_AUDIO_SERVICE_URL?.replace(/\/+$/, '');
-  if (!base) {
-    throw new Error('YT_AUDIO_SERVICE_URL is not configured — deploy services/yt-dlp and set the env var');
+const YT_DLP_BIN = process.env.YT_DLP_PATH || 'yt-dlp';
+
+function contentTypeForExt(ext: string): string {
+  switch (ext) {
+    case 'm4a':
+    case 'mp4':
+      return 'audio/mp4';
+    case 'webm':
+      return 'audio/webm';
+    case 'opus':
+      return 'audio/opus';
+    case 'ogg':
+      return 'audio/ogg';
+    case 'mp3':
+      return 'audio/mpeg';
+    default:
+      return 'application/octet-stream';
   }
+}
+
+async function fetchAudioFromYouTube(rawUrl: string): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
   if (!isYouTubeUrl(rawUrl)) {
     throw new Error('Provide a youtube.com or youtu.be URL');
   }
 
-  const apiKey = process.env.YT_AUDIO_SERVICE_KEY;
-  const res = await fetch(`${base}/audio`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-    },
-    body: JSON.stringify({ url: rawUrl }),
-  });
+  const dir = await mkdtemp(path.join(tmpdir(), 'ytdlp-'));
+  try {
+    const filePath = await new Promise<string>((resolve, reject) => {
+      const args = [
+        '-f', 'bestaudio[ext=m4a]/bestaudio/best',
+        '-o', path.join(dir, '%(id)s.%(ext)s'),
+        '--no-playlist',
+        '--no-warnings',
+        '--quiet',
+        '--max-filesize', '1G',
+        '--print', 'after_move:filepath',
+        rawUrl,
+      ];
+      const proc = spawn(YT_DLP_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      let stdout = '';
+      let stderr = '';
+      proc.stdout.on('data', (b: Buffer) => { stdout += b.toString(); });
+      proc.stderr.on('data', (b: Buffer) => { stderr += b.toString(); });
+      proc.on('error', (err) => {
+        const msg = (err as NodeJS.ErrnoException).code === 'ENOENT'
+          ? 'yt-dlp binary not found — install it on this host (the production Dockerfile already does)'
+          : `yt-dlp failed to start: ${err.message}`;
+        reject(new Error(msg));
+      });
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`yt-dlp exited with ${code}: ${stderr.trim() || stdout.trim() || 'unknown error'}`));
+          return;
+        }
+        const fp = stdout.trim().split('\n').filter(Boolean).pop();
+        if (!fp) {
+          reject(new Error('yt-dlp did not report an output filepath'));
+          return;
+        }
+        resolve(fp);
+      });
+    });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`yt-dlp service failed (${res.status}): ${text || res.statusText}`);
+    const stats = await stat(filePath);
+    if (stats.size > MAX_URL_BYTES) {
+      throw new Error('Downloaded YouTube audio is too large');
+    }
+
+    const buffer = await readFile(filePath);
+    const ext = path.extname(filePath).slice(1).toLowerCase();
+    const contentType = contentTypeForExt(ext);
+    return {
+      buffer,
+      filename: path.basename(filePath),
+      contentType: ALLOWED_TYPES.has(contentType) ? contentType : 'audio/mp4',
+    };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
-
-  const arrayBuffer = await res.arrayBuffer();
-  if (arrayBuffer.byteLength > MAX_URL_BYTES) {
-    throw new Error('Downloaded YouTube audio is too large');
-  }
-
-  const headerType = res.headers.get('content-type')?.split(';')[0]?.trim() ?? 'audio/mp4';
-  const disposition = res.headers.get('content-disposition') ?? '';
-  const match = disposition.match(/filename="?([^"]+)"?/);
-  const filename = match?.[1] ?? 'youtube.m4a';
-  const contentType = ALLOWED_TYPES.has(headerType) ? headerType : 'audio/mp4';
-
-  return { buffer: Buffer.from(arrayBuffer), filename, contentType };
 }
 
 async function fetchAudioFromUrl(rawUrl: string): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
