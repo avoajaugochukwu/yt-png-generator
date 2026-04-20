@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { transcribeAudio, transcribeAudioOpenAI } from '@/lib/transcribe';
@@ -77,6 +77,13 @@ async function fetchAudioFromYouTube(rawUrl: string): Promise<{ buffer: Buffer; 
 
   const dir = await mkdtemp(path.join(tmpdir(), 'ytdlp-'));
   try {
+    let cookiesPath: string | null = null;
+    const cookiesB64 = process.env.YT_DLP_COOKIES_B64;
+    if (cookiesB64) {
+      cookiesPath = path.join(dir, 'cookies.txt');
+      await writeFile(cookiesPath, Buffer.from(cookiesB64, 'base64'));
+    }
+
     const filePath = await new Promise<string>((resolve, reject) => {
       const args = [
         '-f', 'bestaudio[ext=m4a]/bestaudio/best',
@@ -86,6 +93,10 @@ async function fetchAudioFromYouTube(rawUrl: string): Promise<{ buffer: Buffer; 
         '--quiet',
         '--max-filesize', '1G',
         '--print', 'after_move:filepath',
+        // Bot-check workarounds for server IPs:
+        '--extractor-args', 'youtube:player_client=mweb,android,web_safari',
+        '--user-agent', 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+        ...(cookiesPath ? ['--cookies', cookiesPath] : []),
         rawUrl,
       ];
       const proc = spawn(YT_DLP_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -101,7 +112,11 @@ async function fetchAudioFromYouTube(rawUrl: string): Promise<{ buffer: Buffer; 
       });
       proc.on('close', (code) => {
         if (code !== 0) {
-          reject(new Error(`yt-dlp exited with ${code}: ${stderr.trim() || stdout.trim() || 'unknown error'}`));
+          const raw = stderr.trim() || stdout.trim() || 'unknown error';
+          const hint = /sign in to confirm.+not a bot|cookies/i.test(raw) && !cookiesPath
+            ? ' — YouTube is blocking this IP. Export cookies from a logged-in browser, base64-encode the cookies.txt, and set YT_DLP_COOKIES_B64.'
+            : '';
+          reject(new Error(`yt-dlp exited with ${code}: ${raw}${hint}`));
           return;
         }
         const fp = stdout.trim().split('\n').filter(Boolean).pop();
