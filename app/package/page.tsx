@@ -1,0 +1,11 @@
+import PackageForm from './components/PackageForm';
+
+export default function PackagePage() {
+  return (
+    <div className="flex flex-col flex-1 bg-background font-sans">
+      <main className="w-full max-w-6xl mx-auto px-6 py-8 sm:px-8">
+        <PackageForm />
+      </main>
+    </div>
+  );
+}

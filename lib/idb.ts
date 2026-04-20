@@ -135,3 +135,62 @@ export async function clearGridderSession(): Promise<void> {
     tx.onerror = () => reject(tx.error);
   });
 }
+
+// ── Package Session ──
+
+const PACKAGE_SESSION_KEY = 'package-session';
+
+export interface PackageSession {
+  channel: string;
+  scriptText: string;
+  audioUrl: string;
+  customInstructions: string;
+  scriptType: string | null;
+  elements: unknown[] | null;
+  customization: {
+    textColor: string;
+    backgroundColor: string;
+    barColor: string;
+    fontFamily: string;
+  };
+  zipBase64: string | null;
+  titles: unknown[];
+  selectedTitleIdx: number | null;
+  tags: string[];
+  thumbnail: {
+    cells: unknown[];
+    text: { top: string; bottom: string };
+    pngBase64: string | null;
+  } | null;
+  step: string;
+}
+
+export async function savePackageSession(session: PackageSession): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(session, PACKAGE_SESSION_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function getPackageSession(): Promise<PackageSession | undefined> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const request = tx.objectStore(STORE_NAME).get(PACKAGE_SESSION_KEY);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function clearPackageSession(): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).delete(PACKAGE_SESSION_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}

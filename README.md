@@ -26,12 +26,30 @@ Open [http://localhost:3000](http://localhost:3000).
 
 No local ffmpeg/ffprobe install is required — audio decoding happens inside the Modal service.
 
+## Package wizard
+
+`/package` is a 3-step wizard that produces a complete YouTube video package (overlay PNGs + thumbnail) for a given **channel**. Channels are configured in `lib/channels.ts` and bind a script type to a thumbnail spec (grid template, gap colour, text overlay style).
+
+Currently configured: **Garden / listicle** — 3×1 grid, gray gap, 6 px line-gap on a black text bar (white top line + yellow bottom line). Garden uses **deterministic** image sourcing (subject names extracted from the script), so the cells are filled by clicking _Search_ to open Google Images and pasting the chosen image into the selected cell.
+
+Steps:
+
+1. **Script** — pick a channel, paste audio URL or script text.
+2. **Overlays** — analyze + customize, then generate the same overlay PNG ZIP that `/` produces.
+3. **Titles + Thumbnail** — `POST /api/package/seo` seeds **5 CTR-optimized title options** (each using a different psychological principle: loss aversion, curiosity gap, FOMO, etc.) plus the per-cell **image keywords** plus **15-20 YouTube SEO tags** (broad topics + script subjects + long-tail discovery phrases). Each title carries its own `primaryText`/`secondaryText` pair; clicking a title pre-fills the thumbnail's top + bottom lines. You then fill the cells (Search opens Google Images, paste/upload), tweak text if needed, and `POST /api/package/thumbnail-compose` renders the final 1920×1080 thumbnail. Tags are shown in a copy-to-clipboard panel (comma-separated or one-per-line).
+
+This app does **not** generate the YouTube description — that comes from a separate pipeline.
+
+Adding a new channel = adding an entry to `CHANNELS` in `lib/channels.ts` with its `voice` profile (audience, signature moves, avoid patterns, example titles) and one `ThumbnailSpec` per supported `scriptType`. The voice profile is injected into the SEO prompt so titles match the channel's tone.
+
 ## Project layout
 
 - `app/` — Next.js App Router entry (`api/` routes + UI pages).
 - `lib/audio-chunker.ts` — Modal Whisper client (submit job + poll + word→segment grouping).
 - `lib/types.ts` — shared request/response types.
+- `lib/channels.ts` — channel registry (per-channel thumbnail specs).
 - `app/gridder/` — Gridder tool (image-grid composer).
+- `app/package/` — Package wizard (overlays + thumbnail per channel).
 
 ## Deploy
 

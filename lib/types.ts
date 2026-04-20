@@ -111,3 +111,20 @@ export interface GridderState {
 }
 
 export type GridderStep = 'setup' | 'filling' | 'done';
+
+// ── Package types ──
+
+export interface TitleOption {
+  title: string;
+  principle: string;
+  principleNumber: number;
+  estimatedCTR: 'high' | 'medium';
+  primaryText: string;
+  secondaryText: string;
+}
+
+export interface PackageSeoResponse {
+  imageKeywords: string[];
+  titles: TitleOption[];
+  tags: string[];
+}
