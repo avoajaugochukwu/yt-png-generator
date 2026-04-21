@@ -99,7 +99,7 @@ B) titles — exactly 5 title options, each using a DIFFERENT psychological prin
 
 Rank titles by predicted CTR (best first). Each title's primaryText + secondaryText should pair into a complete thumbnail-text (top hook + bottom payoff), like "THEY LOVE 115° HEAT" / "MASSIVE FRUIT HARVEST!".
 
-C) tags — 15-20 relevant YouTube tags for SEO.
+4. TAGS: 15-20 relevant YouTube tags for SEO.
    - Mix of broad and specific tags
    - Include topic keywords, related topics, and long-tail variations
 
@@ -185,15 +185,7 @@ C) tags — 15-20 relevant YouTube tags for SEO.
       estimatedCTR: t.estimatedCTR === 'high' ? 'high' : 'medium',
     }));
 
-    const seenTags = new Set<string>();
-    parsed.tags = (Array.isArray(parsed.tags) ? parsed.tags : [])
-      .map((t) => (typeof t === 'string' ? t.trim().toLowerCase().replace(/^#+/, '') : ''))
-      .filter((t) => {
-        if (!t || seenTags.has(t)) return false;
-        seenTags.add(t);
-        return true;
-      })
-      .slice(0, 25);
+    if (!Array.isArray(parsed.tags)) parsed.tags = [];
 
     return Response.json(parsed);
   } catch (error) {
