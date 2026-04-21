@@ -64,6 +64,12 @@ function drawTextOverlay(
   const bottomLetterSpacing = style.bottomLetterSpacing || 0;
   const strokeColor = style.strokeColor || '#000000';
   const strokeWidth = style.strokeWidth || 0;
+  const shadowColor = style.shadowColor || '#000000';
+  const shadowOffset = style.shadowOffset || 0;
+  const shadowAngle = style.shadowAngle ?? 45;
+  const shadowAngleRad = shadowAngle * (Math.PI / 180);
+  const shadowDx = shadowOffset * Math.cos(shadowAngleRad);
+  const shadowDy = shadowOffset * Math.sin(shadowAngleRad);
   const maxLineWidth = WIDTH - TEXT_PADDING_X * 2;
 
   const topText = top.toUpperCase();
@@ -84,10 +90,14 @@ function drawTextOverlay(
   ctx.lineJoin = 'round';
   ctx.miterLimit = 2;
 
-  // Top line — stroke first so the fill renders on top of the outline
+  // Top line — shadow first, then stroke, then fill on top
   ctx.font = `900 ${topSize}px "${topFont}"`;
   (ctx as unknown as { letterSpacing: string }).letterSpacing = '0px';
   const topBaselineY = barY + TEXT_PADDING_Y + topSize * 0.86;
+  if (shadowOffset > 0) {
+    ctx.fillStyle = shadowColor;
+    ctx.fillText(topText, WIDTH / 2 + shadowDx, topBaselineY + shadowDy);
+  }
   if (strokeWidth > 0) {
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = strokeWidth;
@@ -100,6 +110,10 @@ function drawTextOverlay(
   ctx.font = `${bottomSize}px "${bottomFont}"`;
   (ctx as unknown as { letterSpacing: string }).letterSpacing = `${bottomLetterSpacing}px`;
   const bottomBaselineY = topBaselineY + (topSize - topSize * 0.86) + lineGap + bottomSize * 0.86;
+  if (shadowOffset > 0) {
+    ctx.fillStyle = shadowColor;
+    ctx.fillText(bottomText, WIDTH / 2 + shadowDx, bottomBaselineY + shadowDy);
+  }
   if (strokeWidth > 0) {
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = strokeWidth;

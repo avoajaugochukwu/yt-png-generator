@@ -148,22 +148,19 @@ export interface PackageSession {
   customInstructions: string;
   scriptType: string | null;
   elements: unknown[] | null;
-  customization: {
-    textColor: string;
-    backgroundColor: string;
-    barColor: string;
-    fontFamily: string;
-  };
-  zipBase64: string | null;
   titles: unknown[];
   selectedTitleIdx: number | null;
   tags: string[];
+  allKeywords: string[];
   thumbnail: {
     cells: unknown[];
     text: { top: string; bottom: string };
     pngBase64: string | null;
   } | null;
   step: string;
+  // Legacy fields preserved so old sessions in IndexedDB still deserialize.
+  customization?: unknown;
+  zipBase64?: string | null;
 }
 
 export async function savePackageSession(session: PackageSession): Promise<void> {

@@ -85,7 +85,9 @@ ${CTR_PRINCIPLES}
 === TASK ===
 Given a video script, produce TWO things:
 
-A) imageKeywords — concrete subject names found in the script that should appear as photos in the thumbnail. Each name should be a real-world thing you can search Google Images for (Title Case, no adjectives or articles, no quotes). Prefer names already mentioned in the script. The thumbnail layout has ${spec.imageCount} image slots, so return exactly ${spec.imageCount} keywords ordered by visual impact.
+A) imageKeywords — the top ${spec.imageCount} concrete subject names to feature as photos in the thumbnail. Each name should be a real-world thing you can search Google Images for (Title Case, no adjectives or articles, no quotes). Ordered by visual impact. Return exactly ${spec.imageCount}.
+
+A2) allKeywords — an exhaustive list of 15-25 searchable subjects found in the script (plants, tools, places, techniques, concepts, named items). Same formatting rules as imageKeywords. These give the user alternative image options to drop into any cell. Order by how prominently they feature in the script. The first ${spec.imageCount} may overlap with imageKeywords — that's fine.
 
 B) titles — exactly 5 title options, each using a DIFFERENT psychological principle from the framework. For each title:
    - title: under 70 characters, in the channel's voice. Make it feel natural — never formulaic.
@@ -104,6 +106,7 @@ C) tags — 15-20 relevant YouTube tags for SEO.
 === OUTPUT FORMAT (JSON) ===
 {
   "imageKeywords": ["Subject One", "Subject Two", ...],
+  "allKeywords": ["Subject One", "Subject Two", "Subject Three", "..."],
   "titles": [
     {
       "title": "...",
@@ -147,6 +150,32 @@ C) tags — 15-20 relevant YouTube tags for SEO.
     parsed.imageKeywords = parsed.imageKeywords.slice(0, spec.imageCount);
     while (parsed.imageKeywords.length < spec.imageCount) {
       parsed.imageKeywords.push('');
+    }
+
+    const seenKeywords = new Set<string>();
+    parsed.allKeywords = (Array.isArray(parsed.allKeywords) ? parsed.allKeywords : [])
+      .map((k) => (typeof k === 'string' ? k.trim() : ''))
+      .filter((k) => {
+        if (!k) return false;
+        const lower = k.toLowerCase();
+        if (seenKeywords.has(lower)) return false;
+        seenKeywords.add(lower);
+        return true;
+      })
+      .slice(0, 30);
+
+    // Ensure imageKeywords are represented at the front of allKeywords so the user
+    // can always fall back to whatever seeded the cells.
+    for (const kw of parsed.imageKeywords.slice().reverse()) {
+      if (!kw) continue;
+      const lower = kw.toLowerCase();
+      const existingIdx = parsed.allKeywords.findIndex((k) => k.toLowerCase() === lower);
+      if (existingIdx > 0) {
+        parsed.allKeywords.splice(existingIdx, 1);
+        parsed.allKeywords.unshift(kw);
+      } else if (existingIdx === -1) {
+        parsed.allKeywords.unshift(kw);
+      }
     }
 
     parsed.titles = parsed.titles.slice(0, 5).map((t) => ({

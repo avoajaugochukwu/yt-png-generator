@@ -18,6 +18,12 @@ export interface ThumbnailTextStyle {
   bottomSizeScale: number;
   /** Extra letter-spacing in px applied to the bottom line only. */
   bottomLetterSpacing: number;
+  /** Hard-edged drop shadow — Canva's "Drop" effect with Blur 0. */
+  shadowColor: string;
+  /** Shadow displacement in px at 1920×1080. 0 disables the shadow. */
+  shadowOffset: number;
+  /** Shadow direction in degrees. Canvas convention: 0 = right, 45 = bottom-right, 90 = down. */
+  shadowAngle: number;
 }
 
 export interface ThumbnailSpec {
@@ -97,6 +103,9 @@ const GARDEN_LISTICLE_THUMBNAIL: ThumbnailSpec = {
     strokeWidth: 6,
     bottomSizeScale: 1.18,
     bottomLetterSpacing: 6,
+    shadowColor: '#000000',
+    shadowOffset: 12,
+    shadowAngle: 45,
   },
 };
 

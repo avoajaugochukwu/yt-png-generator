@@ -1,13 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type {
-  VisualElement,
-  CustomizationOptions,
-  TimelineEntry,
-  ScriptType,
-  TitleOption,
-} from '@/lib/types';
+import type { VisualElement, ScriptType, TitleOption } from '@/lib/types';
 import { CHANNELS, getThumbnailSpec, type Channel } from '@/lib/channels';
 import {
   savePackageSession,
@@ -18,18 +12,16 @@ import {
 import { useBridge } from '@/app/hooks/useBridge';
 import { useClipboardPaste } from '@/app/hooks/useClipboardPaste';
 import InputSection from '@/app/components/InputSection';
-import CustomizationPanel from '@/app/components/CustomizationPanel';
-import DownloadArea from '@/app/components/DownloadArea';
 import ChannelPicker from './ChannelPicker';
 import TitlePicker from './TitlePicker';
 import TagsPanel from './TagsPanel';
+import KeywordChips from './KeywordChips';
 import ThumbnailEditor, { type ThumbnailCell } from './ThumbnailEditor';
 
-type PackageStep = 'script' | 'overlays' | 'thumbnail' | 'done';
+type PackageStep = 'script' | 'thumbnail' | 'done';
 
 const STEPS: { key: PackageStep; label: string }[] = [
   { key: 'script', label: 'Script' },
-  { key: 'overlays', label: 'Overlays' },
   { key: 'thumbnail', label: 'Thumbnail' },
   { key: 'done', label: 'Done' },
 ];
@@ -131,13 +123,6 @@ async function urlToDataUri(url: string): Promise<string> {
   });
 }
 
-const DEFAULT_CUSTOMIZATION: CustomizationOptions = {
-  textColor: '#000000',
-  backgroundColor: '#ffffff',
-  barColor: '#60B5F6',
-  fontFamily: 'Anton',
-};
-
 export default function PackageForm() {
   const [step, setStep] = useState<PackageStep>('script');
   const [channel, setChannel] = useState<Channel>('garden');
@@ -148,13 +133,10 @@ export default function PackageForm() {
   const [customInstructions, setCustomInstructions] = useState('');
   const [scriptType, setScriptType] = useState<ScriptType | null>(null);
   const [elements, setElements] = useState<VisualElement[] | null>(null);
-  const [customization, setCustomization] = useState<CustomizationOptions>(DEFAULT_CUSTOMIZATION);
-  const [zipBase64, setZipBase64] = useState<string | null>(null);
-  const [zipUrl, setZipUrl] = useState<string | null>(null);
-  const [timeline, setTimeline] = useState<TimelineEntry[] | null>(null);
   const [titles, setTitles] = useState<TitleOption[]>([]);
   const [selectedTitleIdx, setSelectedTitleIdx] = useState<number | null>(null);
   const [tags, setTags] = useState<string[]>([]);
+  const [allKeywords, setAllKeywords] = useState<string[]>([]);
   const [thumbnailCells, setThumbnailCells] = useState<ThumbnailCell[]>([]);
   const [thumbnailText, setThumbnailText] = useState<{ top: string; bottom: string }>({ top: '', bottom: '' });
   const [thumbnailPngBase64, setThumbnailPngBase64] = useState<string | null>(null);
@@ -186,18 +168,14 @@ export default function PackageForm() {
         setCustomInstructions(s.customInstructions || '');
         setScriptType((s.scriptType as ScriptType | null) ?? null);
         setElements(s.elements as VisualElement[] | null);
-        setCustomization(s.customization || DEFAULT_CUSTOMIZATION);
-        setStep((s.step as PackageStep) || 'script');
-
-        if (s.zipBase64) {
-          setZipBase64(s.zipBase64);
-          const bytes = Uint8Array.from(atob(s.zipBase64), (c) => c.charCodeAt(0));
-          setZipUrl(URL.createObjectURL(new Blob([bytes], { type: 'application/zip' })));
-        }
+        // Legacy sessions may have step === 'overlays'; collapse to the nearest valid step.
+        const restoredStep = (s.step as string) || 'script';
+        setStep(restoredStep === 'overlays' ? 'thumbnail' : (restoredStep as PackageStep));
 
         setTitles((s.titles as TitleOption[]) || []);
         setSelectedTitleIdx(s.selectedTitleIdx ?? null);
         setTags(s.tags || []);
+        setAllKeywords(s.allKeywords || []);
 
         if (s.thumbnail) {
           setThumbnailCells((s.thumbnail.cells as ThumbnailCell[]) || []);
@@ -224,11 +202,10 @@ export default function PackageForm() {
       customInstructions,
       scriptType,
       elements,
-      customization,
-      zipBase64,
       titles,
       selectedTitleIdx,
       tags,
+      allKeywords,
       thumbnail: {
         cells: thumbnailCells,
         text: thumbnailText,
@@ -246,23 +223,15 @@ export default function PackageForm() {
     customInstructions,
     scriptType,
     elements,
-    customization,
-    zipBase64,
     titles,
     selectedTitleIdx,
     tags,
+    allKeywords,
     thumbnailCells,
     thumbnailText,
     thumbnailPngBase64,
     step,
   ]);
-
-  // Cleanup blob URLs
-  useEffect(() => {
-    return () => {
-      if (zipUrl) URL.revokeObjectURL(zipUrl);
-    };
-  }, [zipUrl]);
 
   useEffect(() => {
     return () => {
@@ -358,103 +327,85 @@ export default function PackageForm() {
 
       setScriptType(data.scriptType);
       setElements(data.elements);
-      setStep('overlays');
+      setStep('thumbnail');
+      await runSeo({
+        scriptType: data.scriptType,
+        elements: data.elements,
+        preserveCells: false,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
     } finally {
       setIsLoading(false);
     }
+    // runSeo is stable via closure over state setters; deps cover the inputs it reads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scriptText, audioFile, audioUrl, youtubeUrl, customInstructions, channel, channelConfig]);
 
-  const handleGenerateOverlays = useCallback(async () => {
-    if (!elements) return;
-    setError('');
-    setIsLoading(true);
-    if (zipUrl) {
-      URL.revokeObjectURL(zipUrl);
-      setZipUrl(null);
-    }
+  const runSeo = useCallback(
+    async (opts?: {
+      scriptType?: ScriptType;
+      elements?: VisualElement[] | null;
+      preserveCells?: boolean;
+    }) => {
+      const stArg = opts?.scriptType ?? scriptType;
+      const elsArg = opts?.elements ?? elements;
+      if (!stArg) return;
+      const spec = getThumbnailSpec(channel, stArg);
+      if (!spec) return;
 
-    try {
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ elements, customization }),
-      });
-      if (!res.ok) {
+      setSeoLoading(true);
+      try {
+        const itemNames = elsArg ? extractListicleNames(elsArg) : [];
+        const res = await fetch('/api/package/seo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channel,
+            scriptType: stArg,
+            script: scriptText,
+            itemNames,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'SEO generation failed');
+        }
         const data = await res.json();
-        throw new Error(data.error || 'Generation failed');
+        const cells: ThumbnailCell[] = (data.imageKeywords as string[]).map((kw) => ({
+          keyword: kw,
+          imageUrl: null,
+          cropOffsetX: 0.5,
+          cropOffsetY: 0.5,
+          zoom: 1,
+        }));
+        setThumbnailCells((prev) =>
+          opts?.preserveCells !== false && prev.length === cells.length
+            ? prev.map((p, i) => ({ ...p, keyword: cells[i].keyword }))
+            : cells,
+        );
+        setTitles(data.titles);
+        setSelectedTitleIdx(0);
+        setTags(data.tags || []);
+        setAllKeywords(Array.isArray(data.allKeywords) ? data.allKeywords : []);
+        const first = data.titles[0];
+        if (first) {
+          setThumbnailText({ top: first.primaryText, bottom: first.secondaryText });
+        }
+        setSelectedCellIdx(0);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'SEO seed failed');
+      } finally {
+        setSeoLoading(false);
       }
-      const data = await res.json();
-      setTimeline(data.timeline);
-      setZipBase64(data.zip);
-      const bytes = Uint8Array.from(atob(data.zip), (c) => c.charCodeAt(0));
-      setZipUrl(URL.createObjectURL(new Blob([bytes], { type: 'application/zip' })));
-
-      // Move to thumbnail step and seed SEO (only if not already seeded)
-      setStep('thumbnail');
-      if (titles.length === 0 || thumbnailCells.length === 0) {
-        await seedSeo();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Generation failed');
-    } finally {
-      setIsLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elements, customization, zipUrl, titles.length, thumbnailCells.length]);
-
-  const seedSeo = useCallback(async () => {
-    if (!scriptType || !thumbnailSpec) return;
-    setSeoLoading(true);
-    try {
-      const itemNames = elements ? extractListicleNames(elements) : [];
-      const res = await fetch('/api/package/seo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channel,
-          scriptType,
-          script: scriptText,
-          itemNames,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'SEO generation failed');
-      }
-      const data = await res.json();
-      const cells: ThumbnailCell[] = data.imageKeywords.map((kw: string) => ({
-        keyword: kw,
-        imageUrl: null,
-        cropOffsetX: 0.5,
-        cropOffsetY: 0.5,
-        zoom: 1,
-      }));
-      setThumbnailCells((prev) =>
-        prev.length === cells.length
-          ? prev.map((p, i) => ({ ...p, keyword: cells[i].keyword }))
-          : cells,
-      );
-      setTitles(data.titles);
-      setSelectedTitleIdx(0);
-      setTags(data.tags || []);
-      const first = data.titles[0];
-      if (first) {
-        setThumbnailText({ top: first.primaryText, bottom: first.secondaryText });
-      }
-      setSelectedCellIdx(0);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'SEO seed failed');
-    } finally {
-      setSeoLoading(false);
-    }
-  }, [channel, scriptType, scriptText, elements, thumbnailSpec]);
+    },
+    [channel, scriptType, scriptText, elements],
+  );
 
   const handleRegenerateSeo = useCallback(async () => {
     setError('');
-    await seedSeo();
-  }, [seedSeo]);
+    await runSeo();
+  }, [runSeo]);
 
   const handleSelectTitle = useCallback(
     (idx: number) => {
@@ -533,7 +484,6 @@ export default function PackageForm() {
   }, []);
 
   function handleReset() {
-    if (zipUrl) URL.revokeObjectURL(zipUrl);
     if (thumbnailPngUrl) URL.revokeObjectURL(thumbnailPngUrl);
     setStep('script');
     setScriptText('');
@@ -543,12 +493,10 @@ export default function PackageForm() {
     setCustomInstructions('');
     setScriptType(null);
     setElements(null);
-    setZipBase64(null);
-    setZipUrl(null);
-    setTimeline(null);
     setTitles([]);
     setSelectedTitleIdx(null);
     setTags([]);
+    setAllKeywords([]);
     setThumbnailCells([]);
     setThumbnailText({ top: '', bottom: '' });
     setThumbnailPngBase64(null);
@@ -676,56 +624,7 @@ export default function PackageForm() {
         </>
       )}
 
-      {/* Step 2: Overlays (customize + generate) */}
-      {step === 'overlays' && elements && (
-        <>
-          <div className="rounded-xl border border-card-border bg-card p-4">
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-muted">Channel:</span>
-              <span className="font-semibold text-foreground">{channelConfig.label}</span>
-              <span className="text-muted">·</span>
-              <span className="text-muted">Script type:</span>
-              <span className="font-semibold text-foreground capitalize">{scriptType}</span>
-              <span className="text-muted">·</span>
-              <span className="text-muted">{elements.length} overlay elements</span>
-            </div>
-          </div>
-
-          <CustomizationPanel
-            customization={customization}
-            onCustomizationChange={setCustomization}
-            customInstructions={customInstructions}
-            onCustomInstructionsChange={setCustomInstructions}
-            previewElement={
-              elements.find((e) => e.type !== 'main-title') || elements[0] || null
-            }
-          />
-
-          <button
-            onClick={handleGenerateOverlays}
-            disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white shadow-md shadow-accent-glow hover:bg-accent-hover hover:shadow-lg hover:shadow-accent-glow/40 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? (
-              <>
-                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Generating overlays + thumbnail spec...
-              </>
-            ) : (
-              'Generate Overlays & Continue to Thumbnail'
-            )}
-          </button>
-
-          {zipUrl && (
-            <DownloadArea zipUrl={zipUrl} elements={elements} scriptText={scriptText} timeline={timeline} />
-          )}
-        </>
-      )}
-
-      {/* Step 3: Titles + Thumbnail */}
+      {/* Step 2: Titles + Thumbnail */}
       {step === 'thumbnail' && thumbnailSpec && (
         <>
           <TitlePicker
@@ -749,11 +648,12 @@ export default function PackageForm() {
             isLoading={isLoading}
             isSeeding={seoLoading}
           />
+          <KeywordChips keywords={allKeywords} />
           <TagsPanel tags={tags} />
         </>
       )}
 
-      {/* Step 4: Done */}
+      {/* Step 3: Done */}
       {step === 'done' && thumbnailPngUrl && (
         <div className="space-y-5">
           <div className="rounded-xl border border-success/20 bg-success-light p-6">
@@ -764,10 +664,8 @@ export default function PackageForm() {
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-semibold text-success">Package Ready</h3>
-                <p className="mt-1 text-sm text-success/80">
-                  Thumbnail composed at 1920×1080. Overlay PNGs are bundled in the ZIP.
-                </p>
+                <h3 className="text-base font-semibold text-success">Thumbnail Ready</h3>
+                <p className="mt-1 text-sm text-success/80">Composed at 1920×1080.</p>
                 {selectedTitleIdx != null && titles[selectedTitleIdx] && (
                   <div className="mt-3 rounded-lg bg-white/60 dark:bg-black/20 border border-success/20 px-3 py-2">
                     <div className="text-[10px] font-medium uppercase tracking-wider text-success/70">
@@ -789,18 +687,6 @@ export default function PackageForm() {
                     </svg>
                     Download Thumbnail
                   </a>
-                  {zipUrl && (
-                    <a
-                      href={zipUrl}
-                      download="overlays.zip"
-                      className="inline-flex items-center gap-2 rounded-xl border border-card-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-surface transition-colors"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download Overlays ZIP
-                    </a>
-                  )}
                   <button
                     onClick={() => setStep('thumbnail')}
                     className="rounded-xl border border-card-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-surface transition-colors"
@@ -829,6 +715,7 @@ export default function PackageForm() {
             </div>
           </div>
 
+          <KeywordChips keywords={allKeywords} />
           <TagsPanel tags={tags} />
         </div>
       )}

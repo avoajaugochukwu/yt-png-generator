@@ -43,6 +43,17 @@ export default function ThumbnailEditor({
   const filledCount = cells.filter((c) => c.imageUrl).length;
   const canCompose = filledCount === cells.length && text.top.trim() && text.bottom.trim();
 
+  // Shadow expressed as a fraction of the top-line font size so it scales with the responsive preview.
+  // Canvas renders at TEXT_FONT_SIZE = 144px, so shadowOffset / 144 is the em equivalent.
+  const shadowAngleRad = (spec.text.shadowAngle ?? 45) * (Math.PI / 180);
+  const shadowEm = (spec.text.shadowOffset || 0) / 144;
+  const shadowDxEm = shadowEm * Math.cos(shadowAngleRad);
+  const shadowDyEm = shadowEm * Math.sin(shadowAngleRad);
+  const shadowFilter =
+    shadowEm > 0
+      ? `drop-shadow(${shadowDxEm.toFixed(3)}em ${shadowDyEm.toFixed(3)}em 0 ${spec.text.shadowColor})`
+      : undefined;
+
   return (
     <div className="space-y-5">
       {/* Top info bar */}
@@ -148,6 +159,7 @@ export default function ThumbnailEditor({
                 marginBottom: `${spec.text.lineGap}px`,
                 WebkitTextStroke: `2px ${spec.text.strokeColor}`,
                 paintOrder: 'stroke fill',
+                filter: shadowFilter,
               }}
             >
               {text.top.toUpperCase() || 'TOP LINE PREVIEW'}
@@ -162,6 +174,7 @@ export default function ThumbnailEditor({
                 letterSpacing: '0.04em',
                 WebkitTextStroke: `2px ${spec.text.strokeColor}`,
                 paintOrder: 'stroke fill',
+                filter: shadowFilter,
               }}
             >
               {text.bottom.toUpperCase() || 'BOTTOM LINE PREVIEW'}

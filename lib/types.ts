@@ -124,7 +124,10 @@ export interface TitleOption {
 }
 
 export interface PackageSeoResponse {
+  /** Top N keywords (N = thumbnail spec imageCount) used to pre-fill thumbnail cells. */
   imageKeywords: string[];
+  /** Full exhaustive list of searchable subjects found in the script (15-25). */
+  allKeywords: string[];
   titles: TitleOption[];
   tags: string[];
 }

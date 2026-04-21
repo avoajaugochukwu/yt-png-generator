@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format loosely follows 
 ## [Unreleased]
 
 ### Changed
+- **`/package` wizard collapsed from 4 steps to 3: script → thumbnail → done.** The overlay-generation step (channel customization + ZIP download) is gone for now — Analyze now pipes straight into the SEO seed and the thumbnail editor. Removes `handleGenerateOverlays`, the "Download Overlays ZIP" CTA on the done screen, and the `customization` / `zipBase64` fields in the persisted `PackageSession` (legacy sessions with those fields still deserialize; a stored `step === 'overlays'` is collapsed to `'thumbnail'` on restore).
+- **`POST /api/package/seo` now returns an `allKeywords` array alongside `imageKeywords`.** `imageKeywords` stays capped to `spec.imageCount` (the top-3 picks that pre-fill the cells). `allKeywords` is an exhaustive 15-25 entry list of searchable subjects found in the script — deduped server-side, with every `imageKeyword` hoisted to the front so the cell picks always appear first. `PackageSeoResponse` gained the matching field.
+
+### Added
+- **Clickable image-keyword chips on `/package`.** New `KeywordChips` panel renders every `allKeywords` entry as a button; clicking opens Google Images for that keyword in a new tab, and a single "Copy comma-separated" action dumps the whole list to the clipboard. Appears under the thumbnail editor and on the done screen. This replaces the old workaround of going back to `/` to get more keyword options when the 3 pre-seeded cells weren't the right picks.
+- **Canva-style hard drop shadow on thumbnail text.** `ThumbnailTextStyle` gained `shadowColor`, `shadowOffset` (px at 1920×1080), and `shadowAngle` (degrees; 45 = bottom-right). `drawTextOverlay` now paints an offset fill pass in the shadow color *before* the stroke + main fill, producing the sharp zero-blur drop effect from Canva. The live preview in `ThumbnailEditor` mirrors it with `filter: drop-shadow(… 0 color)` sized in `em` so it tracks the responsive font size. Garden / listicle ships with `#000000`, offset 12 px, angle 45°.
+
+### Changed
 - **Transcription** now uses the Modal-hosted Whisper service (`whisper-transcribe-web.modal.run`) instead of OpenAI Whisper with local ffmpeg/ffprobe chunking. The new service returns word-level timestamps (`{word, start, end}`) which are grouped into segments using a 0.7s pause threshold and an 8s max-segment cap. This produces tighter segment boundaries and more accurate PNG overlay placement.
 - **`/api/analyze` minimum gap** between consecutive timestamped elements reduced from **20s → 4s** (both the system prompt and the post-processing enforcement in `app/api/analyze/route.ts`). Combined with finer-grained segments from the new transcription service, visual overlays can now land closer to the words that cue them.
 
