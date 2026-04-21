@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ## [Unreleased]
 
+### Changed
+- **Image-keyword chips on `/package` step 2 now render above the Images section instead of below the editor.** `KeywordChips` moved inside `ThumbnailEditor` (slotted right before the cells grid) so the user sees the full keyword list before picking which cells to fill. The done-screen `KeywordChips` is unchanged. Hint copy updated — it no longer says "the 3 cells above" since the cells are now below the chips.
+
 ### Fixed
 - **`/package` Analyze no longer fails with "Script text is required" when the script came from a YouTube URL.** `handleAnalyze` calls `setScriptText(transcribed)` and then immediately calls `runSeo()` in the same tick — `runSeo`'s `useCallback` closure still held the pre-transcription (empty) `scriptText`, so `/api/package/seo` received `script: ""` and 400'd. `runSeo` now takes an optional `script` opt (same pattern as `scriptType` / `elements`) that `handleAnalyze` passes the fresh transcript through, bypassing the stale closure. The "Regenerate text & keywords" button on step 2 still reads from state, which is correct by then.
 
