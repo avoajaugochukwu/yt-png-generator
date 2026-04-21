@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ## [Unreleased]
 
+### Fixed
+- **`/package` Analyze no longer fails with "Script text is required" when the script came from a YouTube URL.** `handleAnalyze` calls `setScriptText(transcribed)` and then immediately calls `runSeo()` in the same tick — `runSeo`'s `useCallback` closure still held the pre-transcription (empty) `scriptText`, so `/api/package/seo` received `script: ""` and 400'd. `runSeo` now takes an optional `script` opt (same pattern as `scriptType` / `elements`) that `handleAnalyze` passes the fresh transcript through, bypassing the stale closure. The "Regenerate text & keywords" button on step 2 still reads from state, which is correct by then.
+
 ### Changed
 - **`/api/package/seo` tag generation aligned with `yt-history-script-generator`'s `/metadata` flow.** The tag section of the SEO prompt is now labeled `4. TAGS:` with the exact wording used by `SEO_METADATA_PROMPT` in the reference app ("15-20 relevant YouTube tags for SEO. Mix of broad and specific tags. Include topic keywords, related topics, and long-tail variations."). The server-side post-processing (lowercasing, leading-`#` stripping, dedup, 25-cap) is gone — tags are returned to the client exactly as the model emits them, matching the reference's pass-through flow. Only an `Array.isArray` guard remains so the response stays typed.
 - **`/package` wizard collapsed from 4 steps to 3: script → thumbnail → done.** The overlay-generation step (channel customization + ZIP download) is gone for now — Analyze now pipes straight into the SEO seed and the thumbnail editor. Removes `handleGenerateOverlays`, the "Download Overlays ZIP" CTA on the done screen, and the `customization` / `zipBase64` fields in the persisted `PackageSession` (legacy sessions with those fields still deserialize; a stored `step === 'overlays'` is collapsed to `'thumbnail'` on restore).

@@ -331,6 +331,7 @@ export default function PackageForm() {
       await runSeo({
         scriptType: data.scriptType,
         elements: data.elements,
+        script,
         preserveCells: false,
       });
     } catch (err) {
@@ -346,10 +347,12 @@ export default function PackageForm() {
     async (opts?: {
       scriptType?: ScriptType;
       elements?: VisualElement[] | null;
+      script?: string;
       preserveCells?: boolean;
     }) => {
       const stArg = opts?.scriptType ?? scriptType;
       const elsArg = opts?.elements ?? elements;
+      const scriptArg = opts?.script ?? scriptText;
       if (!stArg) return;
       const spec = getThumbnailSpec(channel, stArg);
       if (!spec) return;
@@ -363,7 +366,7 @@ export default function PackageForm() {
           body: JSON.stringify({
             channel,
             scriptType: stArg,
-            script: scriptText,
+            script: scriptArg,
             itemNames,
           }),
         });
