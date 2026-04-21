@@ -642,6 +642,7 @@ export default function PackageForm() {
             cells={thumbnailCells}
             text={thumbnailText}
             selectedIdx={selectedCellIdx}
+            allKeywords={allKeywords}
             onSelectCell={setSelectedCellIdx}
             onSetCellImage={handleSetCellImage}
             onClearCellImage={handleClearCellImage}
@@ -651,7 +652,6 @@ export default function PackageForm() {
             isLoading={isLoading}
             isSeeding={seoLoading}
           />
-          <KeywordChips keywords={allKeywords} />
           <TagsPanel tags={tags} />
         </>
       )}

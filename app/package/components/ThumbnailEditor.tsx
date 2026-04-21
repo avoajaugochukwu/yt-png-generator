@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import type { ThumbnailSpec } from '@/lib/channels';
+import KeywordChips from './KeywordChips';
 
 export interface ThumbnailCell {
   keyword: string;
@@ -16,6 +17,7 @@ interface Props {
   cells: ThumbnailCell[];
   text: { top: string; bottom: string };
   selectedIdx: number | null;
+  allKeywords: string[];
   onSelectCell: (idx: number) => void;
   onSetCellImage: (idx: number, dataUri: string) => void;
   onClearCellImage: (idx: number) => void;
@@ -31,6 +33,7 @@ export default function ThumbnailEditor({
   cells,
   text,
   selectedIdx,
+  allKeywords,
   onSelectCell,
   onSetCellImage,
   onClearCellImage,
@@ -81,6 +84,8 @@ export default function ThumbnailEditor({
           {isSeeding ? 'Generating…' : 'Regenerate text & keywords'}
         </button>
       </div>
+
+      <KeywordChips keywords={allKeywords} />
 
       {/* Image cells */}
       <div className="rounded-xl border border-card-border bg-card p-4">

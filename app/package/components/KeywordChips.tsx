@@ -50,7 +50,7 @@ export default function KeywordChips({ keywords }: Props) {
       </div>
 
       <p className="text-xs text-muted mb-3">
-        Click any keyword to open it in Google Images. Use these when you need more subject options than the 3 cells above.
+        Click any keyword to open it in Google Images. Use these when you need more subject options than the pre-filled thumbnail cells.
       </p>
 
       <div className="flex flex-wrap gap-1.5">
