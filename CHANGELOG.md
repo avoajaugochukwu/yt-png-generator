@@ -5,6 +5,7 @@ All notable changes to this project are documented here. Format loosely follows 
 ## [Unreleased]
 
 ### Changed
+- **Cmd/Ctrl+V into `/package` step 2 and `/gridder` now accepts image URLs copied from the web, not just files and bare image-extension URLs.** `useClipboardPaste` previously rejected any pasted URL that didn't end in `.jpg/.png/.gif/.webp/.svg/.bmp/.avif`, so pasting a Google CDN URL, an Unsplash link, or any URL with querystring auth failed silently. The hook now accepts any `http(s)://` URL (the image proxy already validates by fetching) and falls back to extracting `<img src>` from `text/html` clipboard payloads — which is what browsers put on the clipboard when you right-click → Copy Image. The existing `isInput` guard still prevents URL pastes from triggering when the target is an input/textarea.
 - **Image-keyword chips on `/package` step 2 now render above the Images section instead of below the editor.** `KeywordChips` moved inside `ThumbnailEditor` (slotted right before the cells grid) so the user sees the full keyword list before picking which cells to fill. The done-screen `KeywordChips` is unchanged. Hint copy updated — it no longer says "the 3 cells above" since the cells are now below the chips.
 
 ### Fixed
