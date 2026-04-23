@@ -31,12 +31,14 @@ export default async function RootLayout({
   const host = headersList.get("host") ?? "";
   const isLocalhost = host.startsWith("localhost") || host.startsWith("127.0.0.1");
 
+  let headerUser: { name: string | null; email: string | null } | null = null;
+
   if (!isLocalhost) {
-    const { getAccessToken, isAuthenticated } = getKindeServerSession();
+    const { getAccessToken, isAuthenticated, getUser } = getKindeServerSession();
 
     const isAuth = await isAuthenticated();
     if (!isAuth) {
-      // Proxy handles redirect, this is a backup
+      redirect("/api/auth/login");
     }
 
     // Kill switch: ping Kinde's live API on every page load
@@ -54,9 +56,15 @@ export default async function RootLayout({
         if (!liveCheck.ok) {
           redirect("/api/auth/logout");
         }
-      } catch (e) {
+      } catch {
         // If Kinde is unreachable, allow user to stay (fail-open)
       }
+    }
+
+    const user = await getUser();
+    if (user) {
+      const name = [user.given_name, user.family_name].filter(Boolean).join(" ") || null;
+      headerUser = { name, email: user.email ?? null };
     }
   }
 
@@ -66,7 +74,7 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Header />
+        <Header user={headerUser} />
         {children}
       </body>
     </html>

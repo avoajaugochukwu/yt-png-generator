@@ -9,8 +9,11 @@ const navItems = [
   { href: '/package', label: 'Package' },
 ];
 
-export default function Header() {
+type HeaderUser = { name: string | null; email: string | null } | null;
+
+export default function Header({ user }: { user: HeaderUser }) {
   const pathname = usePathname();
+  const displayName = user?.name || user?.email || null;
 
   return (
     <header className="border-b border-card-border bg-card">
@@ -44,6 +47,23 @@ export default function Header() {
             );
           })}
         </nav>
+
+        {displayName && (
+          <div className="ml-auto flex items-center gap-3">
+            <span
+              className="text-sm text-muted-foreground truncate max-w-[200px]"
+              title={user?.email ?? undefined}
+            >
+              {displayName}
+            </span>
+            <a
+              href="/api/auth/logout"
+              className="px-3 py-1.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+            >
+              Log out
+            </a>
+          </div>
+        )}
       </div>
     </header>
   );
