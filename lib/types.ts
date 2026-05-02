@@ -124,10 +124,36 @@ export interface TitleOption {
 }
 
 export interface PackageSeoResponse {
-  /** Top N keywords (N = thumbnail spec imageCount) used to pre-fill thumbnail cells. */
+  /** Top N keywords (N = thumbnail spec imageCount) used to pre-fill thumbnail cells. Empty for AI-image channels. */
   imageKeywords: string[];
   /** Full exhaustive list of searchable subjects found in the script (15-25). */
   allKeywords: string[];
   titles: TitleOption[];
   tags: string[];
+}
+
+// ── Heritage (AI-image channel) types ──
+
+export type HeritageCenterSubMode = 'object' | 'job' | 'food';
+
+export interface HeritagePromptGroup {
+  /** Plain-English description of what this prompt produces. */
+  description: string;
+  /** Three full image-gen prompt variations the user can pick from. */
+  variations: string[];
+}
+
+export interface HeritagePromptResponse {
+  /** Short ALL-CAPS hook for the thumbnail's top bar (e.g. "FORGOTTEN FARM TRICKS"). 2-4 words. */
+  thumbnailTitle: string;
+  /** Echo of the chosen center sub-mode. */
+  centerSubMode: HeritageCenterSubMode;
+  prompts: {
+    /** Center subject — modern colors, dramatic, single-focus. */
+    center: HeritagePromptGroup;
+    /** Left flanking figure — sepia-toned 1800s person. */
+    leftFigure: HeritagePromptGroup;
+    /** Right flanking figure — sepia-toned 1800s person, different from left. */
+    rightFigure: HeritagePromptGroup;
+  };
 }

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import openai from '@/lib/openai';
-import { CHANNELS, getThumbnailSpec, type Channel } from '@/lib/channels';
+import { CHANNELS, getThumbnailSpec, hasThumbnailSupport, type Channel } from '@/lib/channels';
 import type { ScriptType, PackageSeoResponse } from '@/lib/types';
 
 interface RequestBody {
@@ -50,8 +50,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Unknown channel' }, { status: 400 });
     }
 
-    const spec = getThumbnailSpec(body.channel, body.scriptType);
-    if (!spec) {
+    if (!hasThumbnailSupport(body.channel, body.scriptType)) {
       return Response.json(
         { error: `Channel "${body.channel}" does not yet support scriptType "${body.scriptType}".` },
         { status: 400 },
@@ -62,6 +61,11 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Script text is required' }, { status: 400 });
     }
 
+    // AI-image channels (Heritage) source images from a separate prompt-studio flow,
+    // so this endpoint only owns titles + tags + allKeywords for them.
+    const spec = getThumbnailSpec(body.channel, body.scriptType);
+    const isAiChannel = channelConfig.imageMode === 'ai' || !spec;
+    const imageCount = spec?.imageCount ?? 0;
     const voice = channelConfig.voice;
 
     const systemPrompt = `You are a YouTube SEO expert specializing in CTR optimization for the "${channelConfig.label}" channel.
@@ -83,11 +87,15 @@ ${voice.exampleTitles.map((t) => `- ${t}`).join('\n')}
 ${CTR_PRINCIPLES}
 
 === TASK ===
-Given a video script, produce TWO things:
+Given a video script, produce ${isAiChannel ? 'TWO' : 'THREE'} things:
 
-A) imageKeywords — the top ${spec.imageCount} concrete subject names to feature as photos in the thumbnail. Each name should be a real-world thing you can search Google Images for (Title Case, no adjectives or articles, no quotes). Ordered by visual impact. Return exactly ${spec.imageCount}.
+${
+  isAiChannel
+    ? `A) allKeywords — an exhaustive list of 15-25 searchable subjects found in the script (tools, places, techniques, concepts, named items). Title Case, no adjectives or articles, no quotes. These give the user alternative image options to drop into any image search. Order by how prominently they feature in the script. (This channel uses AI-generated thumbnail art via a separate prompt studio, so no per-cell imageKeywords are needed — return imageKeywords as an empty array.)`
+    : `A) imageKeywords — the top ${imageCount} concrete subject names to feature as photos in the thumbnail. Each name should be a real-world thing you can search Google Images for (Title Case, no adjectives or articles, no quotes). Ordered by visual impact. Return exactly ${imageCount}.
 
-A2) allKeywords — an exhaustive list of 15-25 searchable subjects found in the script (plants, tools, places, techniques, concepts, named items). Same formatting rules as imageKeywords. These give the user alternative image options to drop into any cell. Order by how prominently they feature in the script. The first ${spec.imageCount} may overlap with imageKeywords — that's fine.
+A2) allKeywords — an exhaustive list of 15-25 searchable subjects found in the script (plants, tools, places, techniques, concepts, named items). Same formatting rules as imageKeywords. These give the user alternative image options to drop into any cell. Order by how prominently they feature in the script. The first ${imageCount} may overlap with imageKeywords — that's fine.`
+}
 
 B) titles — exactly 5 title options, each using a DIFFERENT psychological principle from the framework. For each title:
    - title: under 70 characters, in the channel's voice. Make it feel natural — never formulaic.
@@ -120,7 +128,11 @@ Rank titles by predicted CTR (best first). Each title's primaryText + secondaryT
   "tags": ["fruit trees", "heat tolerant plants", "..."]
 }`;
 
-    let userMessage = `Channel: ${channelConfig.label}\nScript type: ${body.scriptType}\nThumbnail layout: ${spec.template.cols}x${spec.template.rows}, ${spec.imageCount} image slots\n\nScript:\n${body.script}`;
+    let userMessage = `Channel: ${channelConfig.label}\nScript type: ${body.scriptType}\n${
+      isAiChannel
+        ? 'Image source: AI-generated three-panel thumbnail (no per-cell keywords).'
+        : `Thumbnail layout: ${spec!.template.cols}x${spec!.template.rows}, ${spec!.imageCount} image slots`
+    }\n\nScript:\n${body.script}`;
 
     if (body.itemNames?.length) {
       userMessage += `\n\nListicle items already extracted (use these to inform image keywords and titles):\n${body.itemNames.join('\n')}`;
@@ -147,9 +159,13 @@ Rank titles by predicted CTR (best first). Each title's primaryText + secondaryT
       return Response.json({ error: 'Invalid AI response format' }, { status: 500 });
     }
 
-    parsed.imageKeywords = parsed.imageKeywords.slice(0, spec.imageCount);
-    while (parsed.imageKeywords.length < spec.imageCount) {
-      parsed.imageKeywords.push('');
+    if (isAiChannel) {
+      parsed.imageKeywords = [];
+    } else {
+      parsed.imageKeywords = parsed.imageKeywords.slice(0, imageCount);
+      while (parsed.imageKeywords.length < imageCount) {
+        parsed.imageKeywords.push('');
+      }
     }
 
     const seenKeywords = new Set<string>();

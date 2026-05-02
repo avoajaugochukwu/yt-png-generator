@@ -44,7 +44,7 @@ export default function ChannelPicker({ channel, onChange }: Props) {
         })}
         <div className="flex flex-col items-start gap-1 rounded-lg border border-dashed border-card-border p-3 opacity-60">
           <span className="text-sm font-semibold text-muted">More channels</span>
-          <span className="text-[11px] text-muted-light">AI-image channels coming soon</span>
+          <span className="text-[11px] text-muted-light">More coming soon</span>
         </div>
       </div>
     </div>

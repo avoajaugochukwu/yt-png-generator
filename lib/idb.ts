@@ -157,6 +157,16 @@ export interface PackageSession {
     text: { top: string; bottom: string };
     pngBase64: string | null;
   } | null;
+  /** Heritage / AI-image channel state (independent of `thumbnail`). */
+  heritage?: {
+    thumbnailTitle: string;
+    centerSubMode: string;
+    prompts: {
+      center: { description: string; variations: string[] };
+      leftFigure: { description: string; variations: string[] };
+      rightFigure: { description: string; variations: string[] };
+    };
+  } | null;
   step: string;
   // Legacy fields preserved so old sessions in IndexedDB still deserialize.
   customization?: unknown;

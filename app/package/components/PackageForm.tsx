@@ -1,8 +1,20 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { VisualElement, ScriptType, TitleOption } from '@/lib/types';
-import { CHANNELS, getThumbnailSpec, type Channel } from '@/lib/channels';
+import type {
+  VisualElement,
+  ScriptType,
+  TitleOption,
+  HeritagePromptResponse,
+  HeritageCenterSubMode,
+} from '@/lib/types';
+import {
+  CHANNELS,
+  getThumbnailSpec,
+  getAiThumbnailSpec,
+  hasThumbnailSupport,
+  type Channel,
+} from '@/lib/channels';
 import {
   savePackageSession,
   getPackageSession,
@@ -17,21 +29,25 @@ import TitlePicker from './TitlePicker';
 import TagsPanel from './TagsPanel';
 import KeywordChips from './KeywordChips';
 import ThumbnailEditor, { type ThumbnailCell } from './ThumbnailEditor';
+import HeritagePromptStudio from './HeritagePromptStudio';
 
 type PackageStep = 'script' | 'thumbnail' | 'done';
 
-const STEPS: { key: PackageStep; label: string }[] = [
+const STEPS_DETERMINISTIC: { key: PackageStep; label: string }[] = [
   { key: 'script', label: 'Script' },
   { key: 'thumbnail', label: 'Thumbnail' },
   { key: 'done', label: 'Done' },
 ];
 
-function stepIndex(step: PackageStep): number {
-  return STEPS.findIndex((s) => s.key === step);
-}
+const STEPS_AI: { key: PackageStep; label: string }[] = [
+  { key: 'script', label: 'Script' },
+  { key: 'thumbnail', label: 'Prompts' },
+  { key: 'done', label: 'Done' },
+];
 
-function StepIndicator({ currentStep }: { currentStep: PackageStep }) {
-  const current = stepIndex(currentStep);
+function StepIndicator({ currentStep, mode }: { currentStep: PackageStep; mode: 'deterministic' | 'ai' }) {
+  const STEPS = mode === 'ai' ? STEPS_AI : STEPS_DETERMINISTIC;
+  const current = STEPS.findIndex((s) => s.key === currentStep);
 
   return (
     <div className="flex items-center gap-1 sm:gap-2">
@@ -152,6 +168,16 @@ export default function PackageForm() {
     () => (scriptType ? getThumbnailSpec(channel, scriptType) : null),
     [channel, scriptType],
   );
+  const aiThumbnailSpec = useMemo(
+    () => (scriptType ? getAiThumbnailSpec(channel, scriptType) : null),
+    [channel, scriptType],
+  );
+  const isAiChannel = channelConfig.imageMode === 'ai';
+
+  // Heritage / AI-image studio state
+  const [heritagePrompts, setHeritagePrompts] = useState<HeritagePromptResponse | null>(null);
+  const [heritageSubMode, setHeritageSubMode] = useState<HeritageCenterSubMode>('object');
+  const [heritageLoading, setHeritageLoading] = useState(false);
 
   // Restore session
   useEffect(() => {
@@ -186,6 +212,14 @@ export default function PackageForm() {
             setThumbnailPngUrl(URL.createObjectURL(new Blob([bytes], { type: 'image/png' })));
           }
         }
+        if (s.heritage) {
+          setHeritagePrompts({
+            thumbnailTitle: s.heritage.thumbnailTitle,
+            centerSubMode: s.heritage.centerSubMode as HeritageCenterSubMode,
+            prompts: s.heritage.prompts,
+          });
+          setHeritageSubMode(s.heritage.centerSubMode as HeritageCenterSubMode);
+        }
         setMounted(true);
       })
       .catch(() => setMounted(true));
@@ -211,6 +245,13 @@ export default function PackageForm() {
         text: thumbnailText,
         pngBase64: thumbnailPngBase64,
       },
+      heritage: heritagePrompts
+        ? {
+            thumbnailTitle: heritagePrompts.thumbnailTitle,
+            centerSubMode: heritagePrompts.centerSubMode,
+            prompts: heritagePrompts.prompts,
+          }
+        : null,
       step,
     };
     savePackageSession(session).catch(() => {});
@@ -230,6 +271,7 @@ export default function PackageForm() {
     thumbnailCells,
     thumbnailText,
     thumbnailPngBase64,
+    heritagePrompts,
     step,
   ]);
 
@@ -318,8 +360,7 @@ export default function PackageForm() {
           `${channelConfig.label} channel does not yet support "${data.scriptType}" scripts. Supported: ${channelConfig.supportedScriptTypes.join(', ')}.`,
         );
       }
-      const spec = getThumbnailSpec(channel, data.scriptType);
-      if (!spec) {
+      if (!hasThumbnailSupport(channel, data.scriptType)) {
         throw new Error(
           `${channelConfig.label} channel: thumbnail spec for "${data.scriptType}" is not configured yet.`,
         );
@@ -334,6 +375,14 @@ export default function PackageForm() {
         script,
         preserveCells: false,
       });
+      if (channelConfig.imageMode === 'ai') {
+        await runHeritagePrompts({
+          scriptType: data.scriptType,
+          elements: data.elements,
+          script,
+          subMode: heritageSubMode,
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
     } finally {
@@ -354,8 +403,8 @@ export default function PackageForm() {
       const elsArg = opts?.elements ?? elements;
       const scriptArg = opts?.script ?? scriptText;
       if (!stArg) return;
+      if (!hasThumbnailSupport(channel, stArg)) return;
       const spec = getThumbnailSpec(channel, stArg);
-      if (!spec) return;
 
       setSeoLoading(true);
       try {
@@ -375,18 +424,25 @@ export default function PackageForm() {
           throw new Error(data.error || 'SEO generation failed');
         }
         const data = await res.json();
-        const cells: ThumbnailCell[] = (data.imageKeywords as string[]).map((kw) => ({
-          keyword: kw,
-          imageUrl: null,
-          cropOffsetX: 0.5,
-          cropOffsetY: 0.5,
-          zoom: 1,
-        }));
-        setThumbnailCells((prev) =>
-          opts?.preserveCells !== false && prev.length === cells.length
-            ? prev.map((p, i) => ({ ...p, keyword: cells[i].keyword }))
-            : cells,
-        );
+        if (spec) {
+          const cells: ThumbnailCell[] = (data.imageKeywords as string[]).map((kw) => ({
+            keyword: kw,
+            imageUrl: null,
+            cropOffsetX: 0.5,
+            cropOffsetY: 0.5,
+            zoom: 1,
+          }));
+          setThumbnailCells((prev) =>
+            opts?.preserveCells !== false && prev.length === cells.length
+              ? prev.map((p, i) => ({ ...p, keyword: cells[i].keyword }))
+              : cells,
+          );
+          setSelectedCellIdx(0);
+        } else {
+          // AI channels do not use deterministic cells; clear any stale ones.
+          setThumbnailCells([]);
+          setSelectedCellIdx(null);
+        }
         setTitles(data.titles);
         setSelectedTitleIdx(0);
         setTags(data.tags || []);
@@ -395,7 +451,6 @@ export default function PackageForm() {
         if (first) {
           setThumbnailText({ top: first.primaryText, bottom: first.secondaryText });
         }
-        setSelectedCellIdx(0);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'SEO seed failed');
       } finally {
@@ -405,10 +460,80 @@ export default function PackageForm() {
     [channel, scriptType, scriptText, elements],
   );
 
+  const runHeritagePrompts = useCallback(
+    async (opts?: {
+      scriptType?: ScriptType;
+      elements?: VisualElement[] | null;
+      script?: string;
+      videoTitle?: string;
+      subMode?: HeritageCenterSubMode;
+    }) => {
+      const stArg = opts?.scriptType ?? scriptType;
+      const elsArg = opts?.elements ?? elements;
+      const scriptArg = opts?.script ?? scriptText;
+      const subModeArg = opts?.subMode ?? heritageSubMode;
+      if (!stArg) return;
+      const aiSpec = getAiThumbnailSpec(channel, stArg);
+      if (!aiSpec) return;
+
+      setHeritageLoading(true);
+      try {
+        const itemNames = elsArg ? extractListicleNames(elsArg) : [];
+        const topic = elsArg?.find((el) => el.type === 'main-title')?.text || '';
+        const res = await fetch('/api/package/heritage-prompts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channel,
+            scriptType: stArg,
+            videoTitle: opts?.videoTitle,
+            topic: topic || scriptArg.slice(0, 1500),
+            itemNames,
+            centerSubMode: subModeArg,
+            script: scriptArg,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Heritage prompt generation failed');
+        }
+        const data = (await res.json()) as HeritagePromptResponse;
+        setHeritagePrompts(data);
+        setHeritageSubMode(data.centerSubMode);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Heritage prompt generation failed');
+      } finally {
+        setHeritageLoading(false);
+      }
+    },
+    [channel, scriptType, scriptText, elements, heritageSubMode],
+  );
+
   const handleRegenerateSeo = useCallback(async () => {
     setError('');
     await runSeo();
-  }, [runSeo]);
+    if (isAiChannel) {
+      await runHeritagePrompts();
+    }
+  }, [runSeo, runHeritagePrompts, isAiChannel]);
+
+  const handleRegenerateHeritage = useCallback(async () => {
+    setError('');
+    await runHeritagePrompts();
+  }, [runHeritagePrompts]);
+
+  const handleHeritageSubModeChange = useCallback(
+    async (mode: HeritageCenterSubMode) => {
+      setHeritageSubMode(mode);
+      setError('');
+      await runHeritagePrompts({ subMode: mode });
+    },
+    [runHeritagePrompts],
+  );
+
+  const handleHeritageTitleChange = useCallback((title: string) => {
+    setHeritagePrompts((prev) => (prev ? { ...prev, thumbnailTitle: title } : prev));
+  }, []);
 
   const handleSelectTitle = useCallback(
     (idx: number) => {
@@ -505,6 +630,8 @@ export default function PackageForm() {
     setThumbnailPngBase64(null);
     setThumbnailPngUrl(null);
     setSelectedCellIdx(null);
+    setHeritagePrompts(null);
+    setHeritageSubMode('object');
     setError('');
     clearPackageSession().catch(() => {});
   }
@@ -521,7 +648,7 @@ export default function PackageForm() {
     <div className="space-y-6">
       {/* Header bar */}
       <div className="flex items-center justify-between rounded-xl bg-card border border-card-border px-4 py-3 sm:px-6">
-        <StepIndicator currentStep={step} />
+        <StepIndicator currentStep={step} mode={channelConfig.imageMode} />
         {step !== 'script' && (
           <button
             onClick={handleReset}
@@ -627,8 +754,8 @@ export default function PackageForm() {
         </>
       )}
 
-      {/* Step 2: Titles + Thumbnail */}
-      {step === 'thumbnail' && thumbnailSpec && (
+      {/* Step 2: Titles + Thumbnail (deterministic) */}
+      {step === 'thumbnail' && !isAiChannel && thumbnailSpec && (
         <>
           <TitlePicker
             titles={titles}
@@ -652,6 +779,31 @@ export default function PackageForm() {
             isLoading={isLoading}
             isSeeding={seoLoading}
           />
+          <TagsPanel tags={tags} />
+        </>
+      )}
+
+      {/* Step 2: Titles + Heritage prompt studio (AI channels) */}
+      {step === 'thumbnail' && isAiChannel && aiThumbnailSpec && (
+        <>
+          <TitlePicker
+            titles={titles}
+            selectedIdx={selectedTitleIdx}
+            onSelect={handleSelectTitle}
+            onRegenerate={handleRegenerateSeo}
+            isLoading={isLoading || seoLoading || heritageLoading}
+          />
+          <HeritagePromptStudio
+            data={heritagePrompts}
+            centerSubMode={heritageSubMode}
+            supportedSubModes={aiThumbnailSpec.centerSubModes}
+            onSubModeChange={handleHeritageSubModeChange}
+            onRegenerate={handleRegenerateHeritage}
+            onThumbnailTitleChange={handleHeritageTitleChange}
+            isLoading={isLoading}
+            isSeeding={heritageLoading || seoLoading}
+          />
+          <KeywordChips keywords={allKeywords} />
           <TagsPanel tags={tags} />
         </>
       )}
