@@ -30,6 +30,7 @@ import TagsPanel from './TagsPanel';
 import KeywordChips from './KeywordChips';
 import ThumbnailEditor, { type ThumbnailCell } from './ThumbnailEditor';
 import HeritagePromptStudio from './HeritagePromptStudio';
+import ListicleItemsPanel from './ListicleItemsPanel';
 
 type PackageStep = 'script' | 'thumbnail' | 'done';
 
@@ -173,6 +174,11 @@ export default function PackageForm() {
     [channel, scriptType],
   );
   const isAiChannel = channelConfig.imageMode === 'ai';
+
+  const listicleItems = useMemo(
+    () => (elements && scriptType === 'listicle' ? extractListicleNames(elements) : []),
+    [elements, scriptType],
+  );
 
   // Heritage / AI-image studio state
   const [heritagePrompts, setHeritagePrompts] = useState<HeritagePromptResponse | null>(null);
@@ -779,6 +785,7 @@ export default function PackageForm() {
             onRegenerate={handleRegenerateSeo}
             isLoading={isLoading || seoLoading}
           />
+          <ListicleItemsPanel items={listicleItems} />
           <ThumbnailEditor
             spec={thumbnailSpec}
             cells={thumbnailCells}
@@ -808,6 +815,7 @@ export default function PackageForm() {
             onRegenerate={handleRegenerateSeo}
             isLoading={isLoading || seoLoading || heritageLoading}
           />
+          <ListicleItemsPanel items={listicleItems} />
           <HeritagePromptStudio
             channelLabel={channelConfig.label}
             flankSubtitle={flankSubtitle}
