@@ -4,6 +4,9 @@ import { useState } from 'react';
 import type { HeritagePromptResponse, HeritageCenterSubMode } from '@/lib/types';
 
 interface Props {
+  channelLabel: string;
+  /** Subtitle shown under each flanking-figure card — describes the channel's flank style. */
+  flankSubtitle: string;
   data: HeritagePromptResponse | null;
   centerSubMode: HeritageCenterSubMode;
   supportedSubModes: HeritageCenterSubMode[];
@@ -15,18 +18,12 @@ interface Props {
 }
 
 const SUB_MODE_LABELS: Record<HeritageCenterSubMode, { label: string; hint: string }> = {
-  object: { label: 'Object', hint: 'A single old-time artifact in focus' },
+  auto: { label: 'Auto', hint: 'Let the AI pick (tool / job / food / location)' },
+  tool: { label: 'Tool', hint: 'A single iconic tool / instrument' },
+  object: { label: 'Object', hint: 'A single artifact in focus' },
   job: { label: 'Job', hint: 'A faceless worker mid-action' },
   food: { label: 'Food', hint: 'A hero food shot, no people' },
-};
-
-const SECTION_META: Record<
-  'leftFigure' | 'center' | 'rightFigure',
-  { label: string; subtitle: string; tone: 'sepia' | 'color' }
-> = {
-  leftFigure: { label: 'Left figure', subtitle: 'Sepia · 1800s flanking person', tone: 'sepia' },
-  center: { label: 'Center subject', subtitle: 'Modern colors · dramatic single focus', tone: 'color' },
-  rightFigure: { label: 'Right figure', subtitle: 'Sepia · 1800s flanking person', tone: 'sepia' },
+  location: { label: 'Location', hint: 'A single iconic place / site' },
 };
 
 function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
@@ -68,6 +65,8 @@ function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) 
 }
 
 export default function HeritagePromptStudio({
+  channelLabel,
+  flankSubtitle,
   data,
   centerSubMode,
   supportedSubModes,
@@ -78,6 +77,14 @@ export default function HeritagePromptStudio({
   isSeeding,
 }: Props) {
   const sections: Array<'leftFigure' | 'center' | 'rightFigure'> = ['leftFigure', 'center', 'rightFigure'];
+  const SECTION_META: Record<
+    'leftFigure' | 'center' | 'rightFigure',
+    { label: string; subtitle: string; tone: 'flank' | 'color' }
+  > = {
+    leftFigure: { label: 'Left figure', subtitle: flankSubtitle, tone: 'flank' },
+    center: { label: 'Center subject', subtitle: 'Modern colors · dramatic single focus', tone: 'color' },
+    rightFigure: { label: 'Right figure', subtitle: flankSubtitle, tone: 'flank' },
+  };
   const allPromptsText = data
     ? sections
         .map((key) => {
@@ -110,7 +117,7 @@ export default function HeritagePromptStudio({
                 />
               </svg>
             </div>
-            <h3 className="text-sm font-semibold text-foreground">Heritage prompt studio</h3>
+            <h3 className="text-sm font-semibold text-foreground">{channelLabel} prompt studio</h3>
             <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
               AI · 3 prompts × 3 variations
             </span>
@@ -152,7 +159,15 @@ export default function HeritagePromptStudio({
             <label className="block text-[11px] font-medium uppercase tracking-wider text-muted mb-1.5">
               Center sub-mode
             </label>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div
+              className={`grid gap-1.5 ${
+                supportedSubModes.length <= 3
+                  ? 'grid-cols-3'
+                  : supportedSubModes.length <= 4
+                    ? 'grid-cols-2 sm:grid-cols-4'
+                    : 'grid-cols-2 sm:grid-cols-3'
+              }`}
+            >
               {supportedSubModes.map((mode) => {
                 const meta = SUB_MODE_LABELS[mode];
                 const isActive = centerSubMode === mode;
@@ -177,7 +192,7 @@ export default function HeritagePromptStudio({
         </div>
 
         <p className="text-xs text-muted leading-relaxed">
-          The thumbnail is composed from <strong>3 separate AI generations</strong> — left figure, center subject, right figure. Pick a variation from each, generate the images in your image-gen tool of choice, then assemble. Center stays in modern color; flanks stay in sepia.
+          The thumbnail is composed from <strong>3 separate AI generations</strong> — left figure, center subject, right figure. Pick a variation from each, generate the images in your image-gen tool of choice, then assemble. Center stays in modern color; flanks follow the channel&apos;s flank palette.
         </p>
       </div>
 
@@ -191,7 +206,7 @@ export default function HeritagePromptStudio({
               <div key={key} className="rounded-xl border border-card-border bg-card overflow-hidden flex flex-col">
                 <div
                   className={`px-4 py-3 border-b border-card-border ${
-                    meta.tone === 'sepia' ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-surface'
+                    meta.tone === 'flank' ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-surface'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -201,12 +216,12 @@ export default function HeritagePromptStudio({
                     </div>
                     <span
                       className={`text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                        meta.tone === 'sepia'
+                        meta.tone === 'flank'
                           ? 'bg-amber-200/60 dark:bg-amber-500/20 text-amber-900 dark:text-amber-300'
                           : 'bg-accent-light text-accent'
                       }`}
                     >
-                      {meta.tone === 'sepia' ? 'Sepia' : 'Color'}
+                      {meta.tone === 'flank' ? 'Flank' : 'Color'}
                     </span>
                   </div>
                   {group.description && (

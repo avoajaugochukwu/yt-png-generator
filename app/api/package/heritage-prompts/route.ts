@@ -18,7 +18,14 @@ interface RequestBody {
   script?: string;
 }
 
-const VALID_SUB_MODES: HeritageCenterSubMode[] = ['object', 'job', 'food'];
+const VALID_SUB_MODES: HeritageCenterSubMode[] = ['object', 'job', 'food', 'tool', 'location', 'auto'];
+const NON_AUTO_SUB_MODES: Exclude<HeritageCenterSubMode, 'auto'>[] = [
+  'object',
+  'job',
+  'food',
+  'tool',
+  'location',
+];
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,10 +50,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const requestedSubMode =
-      body.centerSubMode && VALID_SUB_MODES.includes(body.centerSubMode)
+    const requestedSubMode: HeritageCenterSubMode =
+      body.centerSubMode &&
+      VALID_SUB_MODES.includes(body.centerSubMode) &&
+      aiSpec.centerSubModes.includes(body.centerSubMode)
         ? body.centerSubMode
         : aiSpec.centerSubModes[0];
+
+    // For `auto`, the AI must pick from the channel's supported non-`auto` modes.
+    const autoChoices = aiSpec.centerSubModes.filter(
+      (m): m is Exclude<HeritageCenterSubMode, 'auto'> => m !== 'auto',
+    );
+    const isAuto = requestedSubMode === 'auto';
 
     const topic = (body.topic || '').trim() || (body.script || '').trim().slice(0, 1500);
     if (!topic) {
@@ -68,8 +83,30 @@ rightFigure: "${ex.rightFigurePrompt}"`,
       )
       .join('\n\n');
 
+    const centerAnchorsBlock = autoChoices
+      .map((mode) => {
+        const anchor = aiSpec.styleAnchors.center[mode];
+        return anchor ? `Center panel — sub-mode "${mode}":\n${anchor}` : null;
+      })
+      .filter(Boolean)
+      .join('\n\n');
+
+    const subModeTaskBlock = isAuto
+      ? `2. centerSubMode — the user requested "auto". Study the topic and listicle items below and pick the SINGLE most clickbait-iconic center type from this list: ${autoChoices
+          .map((m) => `"${m}"`)
+          .join(', ')}. Output the chosen value (NOT "auto"). Pick:
+   - "tool" when the listicle items are tools, instruments, or equipment.
+   - "job" when the items are occupations, trades, or roles (faceless worker mid-action).
+   - "food" when the items are foods, dishes, or meals.
+   - "location" when the items are places, buildings, or sites.
+   - "object" only as a catch-all if none of the above fit.
+   You may not pick a value not in the list above.`
+      : `2. centerSubMode — echo back: "${requestedSubMode}".`;
+
+    const allowedSubModes = isAuto ? autoChoices : [requestedSubMode];
+
     const systemPrompt = `You are a thumbnail prompt engineer for the "${channelConfig.label}" YouTube channel.
-The channel produces listicles about forgotten / lost / dying skills, crafts, jobs, and foods from the 1800s and early 1900s.
+Channel domain: ${channelConfig.voice.contentDomain}
 Each thumbnail is a three-panel composition assembled from THREE INDEPENDENT image-gen prompts (one image-gen call per panel). They must visually unify but cannot be generated together.
 
 === STYLE ANCHORS (MUST hold across every prompt you write) ===
@@ -83,14 +120,7 @@ ${aiSpec.styleAnchors.leftFigure}
 Right figure panel:
 ${aiSpec.styleAnchors.rightFigure}
 
-Center panel — sub-mode "object":
-${aiSpec.styleAnchors.centerObject}
-
-Center panel — sub-mode "job":
-${aiSpec.styleAnchors.centerJob}
-
-Center panel — sub-mode "food":
-${aiSpec.styleAnchors.centerFood}
+${centerAnchorsBlock}
 
 === FEW-SHOT EXAMPLES (study the level of detail) ===
 
@@ -100,31 +130,33 @@ ${examplesBlock}
 
 Given a video title, topic, and listicle items, produce a JSON package with:
 
-1. thumbnailTitle — 2-4 word ALL-CAPS hook for the thumbnail's top text bar (e.g. "FORGOTTEN FARM TRICKS", "LOST MOUNTAIN SKILLS", "DYING HOMESTEAD JOBS"). Use vocabulary like FORGOTTEN, LOST, DYING, GONE, BEFORE. NOT a copy of the video title — a punchier thumbnail-only headline. Keep it short — these display very large.
+1. thumbnailTitle — 2-4 word ALL-CAPS hook for the thumbnail's top text bar (in this channel's voice). NOT a copy of the video title — a punchier thumbnail-only headline. Keep it short — these display very large.
 
-2. centerSubMode — echo back: "${requestedSubMode}".
+${subModeTaskBlock}
 
-3. prompts.center — a description (one short sentence describing the kind of subject the AI will generate) plus exactly 3 prompt variations.
+3. prompts.center — a description (one short sentence) plus exactly 3 prompt variations.
    - Each variation is a complete photoreal image-gen prompt (Midjourney / DALL-E / Flux compatible).
-   - Each variation features a DIFFERENT specific subject so the user can pick their favorite (e.g. variation 1: butter churn; variation 2: cast-iron cauldron; variation 3: oil lamp).
-   - Honor the chosen sub-mode's style anchor strictly.
+   - Each variation features a DIFFERENT specific subject so the user can pick their favorite.
+   - Honor the chosen sub-mode's style anchor strictly. Allowed sub-modes for the center: ${allowedSubModes
+     .map((m) => `"${m}"`)
+     .join(', ')}.
    - Length: 60-110 words per variation. Bake every needed style detail INTO the prompt — do not assume the model has memory of other prompts.
 
-4. prompts.leftFigure — description + exactly 3 prompt variations. Each variation poses the figure with a DIFFERENT topical hand-prop. SEPIA palette is mandatory for every variation. Each variation must produce a complete usable portrait on its own.
+4. prompts.leftFigure — description + exactly 3 prompt variations. Each variation poses the figure with a DIFFERENT topical hand-prop. Each variation must produce a complete usable portrait on its own and obey the left-figure style anchor.
 
-5. prompts.rightFigure — description + exactly 3 prompt variations. Different person from leftFigure (usually a woman if leftFigure is a man, or vice-versa). SEPIA palette mandatory. Different prop than leftFigure but topically related.
+5. prompts.rightFigure — description + exactly 3 prompt variations. Different person from leftFigure. Different hand-prop than leftFigure but topically related. Obey the right-figure style anchor.
 
 Hard rules:
-- Center stays in MODERN realistic colors (NOT sepia). Both figures stay in SEPIA.
-- Center for sub-mode "job" must NOT show the worker's face.
+- Both flanking figures honor the channel's flank palette anchor (sepia for Heritage, muted Kodachrome for 1950s — do NOT mix).
+- Center for any "job"-style sub-mode must NOT show the worker's face.
 - Every prompt must read as photoreal photography, not illustration / painting / 3D.
-- Every prompt must anchor the era (pre-1920 / 1800s American homestead). NEVER include modern items, electronics, plastics, or post-1920 clothing.
-- Center subject must be SINGULAR — one hero artifact / one worker / one food item. No collages.
+- Every prompt must anchor the era declared in the channel's style anchors. NEVER include items from a later era than the channel covers.
+- Center subject must be SINGULAR — one hero artifact / one worker / one food item / one location. No collages.
 
 === OUTPUT FORMAT (strict JSON) ===
 {
   "thumbnailTitle": "ALL CAPS HOOK",
-  "centerSubMode": "${requestedSubMode}",
+  "centerSubMode": ${isAuto ? `<one of ${autoChoices.map((m) => `"${m}"`).join(' | ')}>` : `"${requestedSubMode}"`},
   "prompts": {
     "center":      { "description": "...", "variations": ["...", "...", "..."] },
     "leftFigure":  { "description": "...", "variations": ["...", "...", "..."] },
@@ -172,9 +204,15 @@ ${
     }
 
     parsed.thumbnailTitle = parsed.thumbnailTitle.trim().toUpperCase();
-    parsed.centerSubMode = VALID_SUB_MODES.includes(parsed.centerSubMode)
-      ? parsed.centerSubMode
-      : requestedSubMode;
+    // Coerce response into a concrete (non-auto) sub-mode that the channel actually supports.
+    if (
+      !VALID_SUB_MODES.includes(parsed.centerSubMode) ||
+      parsed.centerSubMode === 'auto' ||
+      !NON_AUTO_SUB_MODES.includes(parsed.centerSubMode as Exclude<HeritageCenterSubMode, 'auto'>) ||
+      !autoChoices.includes(parsed.centerSubMode as Exclude<HeritageCenterSubMode, 'auto'>)
+    ) {
+      parsed.centerSubMode = isAuto ? autoChoices[0] : requestedSubMode;
+    }
 
     for (const key of ['center', 'leftFigure', 'rightFigure'] as const) {
       const group = parsed.prompts[key];

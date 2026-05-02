@@ -134,7 +134,18 @@ export interface PackageSeoResponse {
 
 // ── Heritage (AI-image channel) types ──
 
-export type HeritageCenterSubMode = 'object' | 'job' | 'food';
+/**
+ * Center-panel sub-mode for any AI three-panel thumbnail channel.
+ * - `auto`   — let the AI pick the most clickbait-iconic type for the script
+ * - `tool`   — single mid-century / vintage tool or instrument hero shot
+ * - `object` — generic singular artifact (fallback)
+ * - `job`    — faceless worker mid-action
+ * - `food`   — hero food shot, no people
+ * - `location` — a single iconic location / building / site
+ *
+ * Each channel declares which subset it supports via `AiThumbnailSpec.centerSubModes`.
+ */
+export type HeritageCenterSubMode = 'object' | 'job' | 'food' | 'tool' | 'location' | 'auto';
 
 export interface HeritagePromptGroup {
   /** Plain-English description of what this prompt produces. */

@@ -1,6 +1,6 @@
 import type { GridTemplate, ScriptType, HeritageCenterSubMode } from './types';
 
-export type Channel = 'garden' | 'heritage';
+export type Channel = 'garden' | 'heritage' | 's1950s';
 
 export type ImageSourceMode = 'deterministic' | 'ai';
 
@@ -64,17 +64,16 @@ export interface HeritageExample {
 
 export interface AiThumbnailSpec {
   /** Layout family — used by the prompt generator to pick a template. */
-  layout: 'three-panel-heritage';
-  /** Center sub-modes the channel supports. First entry is the default. */
+  layout: 'three-panel';
+  /** Center sub-modes the channel supports. First entry is the default. Include `'auto'` to let the AI pick. */
   centerSubModes: HeritageCenterSubMode[];
   /** Style anchors the AI must keep stable across all generations. */
   styleAnchors: {
     overall: string;
     leftFigure: string;
     rightFigure: string;
-    centerObject: string;
-    centerJob: string;
-    centerFood: string;
+    /** Per-sub-mode center anchor. Must include an entry for every non-`auto` mode in `centerSubModes`. */
+    center: Partial<Record<Exclude<HeritageCenterSubMode, 'auto'>, string>>;
   };
   /** Few-shot examples baked into the prompt. */
   examples: HeritageExample[];
@@ -172,8 +171,8 @@ const HERITAGE_VOICE: VoiceProfile = {
 };
 
 const HERITAGE_LISTICLE_AI_THUMBNAIL: AiThumbnailSpec = {
-  layout: 'three-panel-heritage',
-  centerSubModes: ['object', 'job', 'food'],
+  layout: 'three-panel',
+  centerSubModes: ['auto', 'object', 'job', 'food'],
   styleAnchors: {
     overall:
       'Photoreal 16:9 thumbnail composed of three independently generated panels. Left ~25%, center ~50%, right ~25%. Single horizontal frame. Rustic 1800s American homestead world. Each panel is a separate image-gen prompt — they must visually unify (same era, same warm lighting feel) without being identical clones.',
@@ -181,12 +180,14 @@ const HERITAGE_LISTICLE_AI_THUMBNAIL: AiThumbnailSpec = {
       '19th-century American (1800s frontier era), 50-70 years old, weathered. Period-correct clothing (denim work overalls, linen shirt, suspenders, work boots). SEPIA / desaturated warm-tone palette. Direct gaze toward camera. Seated on a wood crate or stump, or standing inside a rustic wooden cabin. Holding/posed with a tool or object thematically tied to the topic. Plain warm-neutral background that blends with rustic wood. Soft natural side light.',
     rightFigure:
       'Same era and SEPIA palette as left figure but a DIFFERENT person — usually a 1800s American woman, 50-65, hair in a bun, in a long apron over a work dress; or a different older man. Direct gaze toward camera. Holding a different object than the left figure but topically related. Plain warm-neutral background that blends with rustic wood.',
-    centerObject:
-      'ONE old-timey object as the hero — a single artifact from before 1920 (cast-iron cauldron, copper still, hand-cranked apparatus, blacksmith tongs, butter churn, oil lamp, etc.). NOT sepia — keeps modern realistic colors so it pops against the muted flanks. Dramatic single-source warm lighting. Centered hero shot, exaggerated detail, sharp focus. Set in a rustic wooden environment (wood plank wall, fireplace, cabin interior). NO people in frame.',
-    centerJob:
-      'A faceless 1800s worker mid-action — face NOT showing (cropped above shoulders or turned away). Hands and tools featured. Old-timey occupation (blacksmith striking iron, cooper hooping a barrel, tinker mending pots, butcher hanging cured meat, butter-churner, wheelwright, etc.). NOT sepia — modern realistic colors so the action pops. Dramatic warm lighting. Rustic wooden setting. Sharp focus on hands and tool.',
-    centerFood:
-      'A hero food shot of pre-industrial American homestead food — fresh-baked sourdough on a wooden board, hanging cured meat, a churn-fresh butter mold on burlap, jars of preserved peaches, a black iron skillet of cornbread, etc. NOT sepia — rich modern realistic food colors. Dramatic single-source warm lighting from above or the side. Rustic wooden table or plank backdrop. NO people in frame.',
+    center: {
+      object:
+        'ONE old-timey object as the hero — a single artifact from before 1920 (cast-iron cauldron, copper still, hand-cranked apparatus, blacksmith tongs, butter churn, oil lamp, etc.). NOT sepia — keeps modern realistic colors so it pops against the muted flanks. Dramatic single-source warm lighting. Centered hero shot, exaggerated detail, sharp focus. Set in a rustic wooden environment (wood plank wall, fireplace, cabin interior). NO people in frame.',
+      job:
+        'A faceless 1800s worker mid-action — face NOT showing (cropped above shoulders or turned away). Hands and tools featured. Old-timey occupation (blacksmith striking iron, cooper hooping a barrel, tinker mending pots, butcher hanging cured meat, butter-churner, wheelwright, etc.). NOT sepia — modern realistic colors so the action pops. Dramatic warm lighting. Rustic wooden setting. Sharp focus on hands and tool.',
+      food:
+        'A hero food shot of pre-industrial American homestead food — fresh-baked sourdough on a wooden board, hanging cured meat, a churn-fresh butter mold on burlap, jars of preserved peaches, a black iron skillet of cornbread, etc. NOT sepia — rich modern realistic food colors. Dramatic single-source warm lighting from above or the side. Rustic wooden table or plank backdrop. NO people in frame.',
+    },
   },
   examples: [
     {
@@ -214,6 +215,82 @@ const HERITAGE_LISTICLE_AI_THUMBNAIL: AiThumbnailSpec = {
   ],
 };
 
+const S1950S_VOICE: VoiceProfile = {
+  contentDomain:
+    'Postwar American life and labor (roughly 1940-1985) — dangerous trades, vanished tools, factory floors, suburban routines, vintage foods, mid-century occupations and locations. Specific worker names, dollar amounts, plant towns, and OSHA-era turning points are the texture.',
+  audience:
+    'Americans 50-80 with parents/grandparents who worked the postwar boom — steel, textiles, auto, refineries, asbestos, lead, uranium. They click on JOBS THAT KILLED, FORGOTTEN TOOLS, FOODS YOUR DAD ATE, and WORKING-CLASS NOSTALGIA framed against the bill-coming-due narrative.',
+  signatureMoves: [
+    'Anchor the decade explicitly (1950s, postwar, pre-OSHA, before EPA, mid-century)',
+    'Use the body-cost frame ("THAT KILLED", "BEFORE 50", "TRADED LUNGS", "FORGOTTEN")',
+    'Round-number listicle scope (10, 15, 25, 30)',
+    'Lean on specificity that signals research (city + plant + year)',
+    'Sound like a working-class historian, not a documentary narrator',
+  ],
+  avoidPatterns: [
+    'Frontier / pioneer / 1800s vocabulary — that\'s the Heritage channel\'s lane',
+    'Soft adjectives ("amazing", "heartwarming", "incredible")',
+    'Modern wellness or self-help framing',
+    'Fluffy nostalgia without the labor / cost angle',
+  ],
+  exampleTitles: [
+    '25 Jobs From the 1950s That Killed Fathers Before They Hit 50',
+    '15 Forgotten Tools Every 1950s Garage Had',
+    '20 Pre-OSHA Trades That Disappeared by 1980',
+    '25 Foods Your Postwar Dad Ate That Are Gone Now',
+    '10 Mid-Century Factory Floors America Forgot',
+  ],
+};
+
+const S1950S_LISTICLE_AI_THUMBNAIL: AiThumbnailSpec = {
+  layout: 'three-panel',
+  centerSubModes: ['auto', 'tool', 'job', 'food', 'object', 'location'],
+  styleAnchors: {
+    overall:
+      'Photoreal 16:9 thumbnail composed of three independently generated panels. Left ~25%, center ~50%, right ~25%. Single horizontal frame. Postwar American world (1940-1985) — steel mills, refineries, sawmills, foundries, auto plants, suburban kitchens, factory floors. Each panel is a separate image-gen prompt — they unify by era and lighting feel without being clones.',
+    leftFigure:
+      'A working-class American man, 35-55, mid-century era (1945-1975). Period-correct clothing — soot-streaked denim work shirt with rolled sleeves, dark work pants, worn leather work boots; or a hard hat + safety glasses + canvas welding apron. Weathered face, slight stubble, calloused hands. MUTED desaturated mid-century color palette — washed-out Kodachrome look, NOT sepia. Direct steady gaze toward camera. Set against a plain warm-neutral industrial backdrop (concrete wall, sheet metal, factory shop floor blur). Holding a tool or workplace artifact relevant to the topic. Soft cool overhead light with a warm fill — like a 1950s factory-floor photograph.',
+    rightFigure:
+      'A 1950s working-class American woman, 30-55 — usually a wife / housewife / widow figure. Period-correct clothing — a 1950s housedress with apron, or a Sunday-best blouse and skirt; hair pin-curled, set, or in a kerchief. Tired but composed expression, direct gaze toward camera. MUTED desaturated mid-century color palette to match the left figure (NOT sepia). Holding an object thematically linked to the topic but DIFFERENT from the left figure (a folded company letter, a Bakelite radio, a pyrex casserole, a framed work photo of her husband). Plain warm-neutral domestic backdrop (faded floral wallpaper, kitchen tile, formica counter blur). Soft natural window light.',
+    center: {
+      tool:
+        'ONE iconic mid-century industrial or domestic tool / instrument as the hero — a single 1950s artifact (asbestos hopper spray gun, hex-chrome plating rack, lead-paint mixing mill, copper rivet hammer, vintage Geiger counter, oxy-acetylene torch, Pyrex casserole dish, hand-crank meat grinder, etc.). NOT desaturated — keeps modern realistic colors so it pops against the muted flanks. Sharp focus, exaggerated detail. Dramatic single-source directional light (warm shop-floor lamp, blue welding flash, or natural window glow). Set against a workshop / factory / kitchen wall backdrop appropriate to the tool. NO people, NO hands in frame.',
+      job:
+        'A faceless 1950s-1970s worker mid-action — face NOT showing (cropped above shoulders, helmet down, or turned away). Hands and tools dominate the frame. Postwar industrial occupation (steel mill open-hearth helper pouring molten ladle, asbestos pipe insulator troweling cement, chrome plater dunking a bumper, refinery benzene washer hosing a condenser, lead smelter charger pushing a barrow, foundry core maker ramming sand, coal stoker shoveling, etc.). NOT desaturated — modern realistic colors so the action pops (orange molten metal, electric blue arc, white asbestos snow). Dramatic warm or arc-flash lighting. Heavy industrial setting (mill, refinery, foundry, plating shop).',
+      food:
+        'A hero food shot of postwar American food (1950s-1970s) — Jell-O mold with suspended fruit on a glass plate, a TV dinner aluminum tray with compartmented turkey + peas + mashed potatoes, a Pyrex casserole of tuna noodle, a Spam loaf on a serving platter, Wonder Bread sandwiches stacked on a Formica table, a Bundt cake with chocolate glaze, etc. NOT desaturated — rich modern realistic food colors. Dramatic single-source overhead or side light. Mid-century Formica or vinyl tablecloth backdrop, with a 1950s glass tumbler or chrome napkin holder visible at the edge. NO people in frame.',
+      object:
+        'ONE iconic mid-century artifact as the hero — a single 1940s-1980s object that is NOT a tool and NOT a food (a Bakelite radio, a chrome Cadillac fender, a Polaroid Land Camera, a typewriter, a vinyl record on a turntable, a porcelain factory shower handle, a Zenith TV cabinet, etc.). NOT desaturated — modern realistic colors. Dramatic single-source directional light. Workshop / domestic / factory backdrop appropriate to the object. NO people in frame.',
+      location:
+        'ONE iconic 1950s-1980s American industrial or domestic location as the hero — a single dramatic place (steel mill open-hearth furnace gallery glowing orange, a refinery flare stack at dusk, an asbestos plant carding-machine room thick with white dust, a uranium ore truck on a red-dirt Colorado plateau road, a 1950s suburban kitchen with avocado-green appliances, a Pittsburgh row-house street under coal smoke, etc.). NOT desaturated — modern realistic colors with dramatic lighting (warm furnace orange, sodium-vapor amber, low-sun gold). Wide enough to feel like a place, tight enough that ONE element dominates. NO people in frame, or only tiny silhouettes for scale.',
+    },
+  },
+  examples: [
+    {
+      thumbnailTitle: 'JOBS THAT KILLED FATHERS',
+      topic: '1950s American postwar trades that caused early death — steel mill helpers, asbestos insulators, lead smelters, chrome platers',
+      centerSubMode: 'job',
+      centerPrompt:
+        'Photoreal 16:9 hero shot of a 1952 steel mill open-hearth ladle pouring a glowing orange-white stream of molten steel into a cast-iron mold below. A faceless worker silhouette in a heavy canvas welding apron and metal-mesh helmet stands at the foreground edge, hands on a long pneumatic ramming bar, face turned away from camera. Sparks rain down like firework embers. Set inside a Pittsburgh Jones-and-Laughlin-style cavernous mill hall, dark steel beams overhead, dim sodium-vapor work lights barely cutting the orange furnace glow. Modern realistic colors — molten orange, deep red shadow, blackened steel, soot-stained denim. Photorealistic, sharp focus on the molten stream and the worker\'s gripping hands. Cinematic 1950s heavy-industry atmosphere.',
+      leftFigurePrompt:
+        'Photoreal portrait of a 45-year-old 1950s American steel mill worker, weathered face, soot-streaked cheeks, dark stubble, short cropped brown hair under a battered chrome-yellow steel hard hat. Wearing a faded blue denim work shirt with sleeves rolled to the elbows, a thick brown leather welding apron over the chest, dark work pants. Body squared to camera, calm direct gaze. Holding a long-handled steel ladle hook in his right hand resting against his shoulder. MUTED desaturated mid-century color palette — washed-out Kodachrome look, slight cool cast (NOT sepia). Plain warm-neutral concrete-wall industrial background blurred behind him. Soft cool overhead light with a faint warm fill. Photorealistic, sharp facial detail.',
+      rightFigurePrompt:
+        'Photoreal portrait of a 42-year-old 1950s American working-class woman — a steelworker\'s wife. Brown hair set in soft pin-curls, slight wrinkles, tired but composed expression, calm direct gaze toward camera. Wearing a faded blue-and-white floral 1950s housedress with a white apron, a thin gold wedding band visible. Standing facing camera, holding a small framed black-and-white photograph of a man in mill work clothes against her chest with both hands. MUTED desaturated mid-century color palette to match the left figure (NOT sepia). Plain warm-neutral domestic background — faded yellow kitchen wallpaper blurred behind her. Soft natural window light from the right. Photorealistic.',
+    },
+    {
+      thumbnailTitle: 'FORGOTTEN GARAGE TOOLS',
+      topic: '1950s American garage and workshop tools that vanished by the 1980s — manual drill braces, brake bleed pumps, hand-crank tire pumps, asbestos brake riveters',
+      centerSubMode: 'tool',
+      centerPrompt:
+        'Photoreal 16:9 hero shot of a 1955-era hand-crank manual drill brace — polished dark walnut handle, chromed steel bow, with a chunky 3/8" spiral-fluted bit locked in the chuck. Sitting alone on a battered oak workbench with faint pencil marks and oil stains. Modern realistic colors — warm walnut, tarnished steel chrome, deep amber wood-grain workbench. Dramatic single-source warm shop-lamp light from the upper-left, throwing a long crisp shadow across the bench. Sharp focus on the brass chuck collar. Faded pegboard with faint outlines of missing tools blurred in the background. NO people, NO hands in frame. Cinematic mid-century workshop atmosphere.',
+      leftFigurePrompt:
+        'Photoreal portrait of a 50-year-old 1955 American shadetree mechanic, slight grey at the temples, dark stubble, calm steady gaze toward camera. Wearing dark blue mechanic\'s coveralls with an embroidered "Gulf" oval patch on the chest, sleeves pushed to the forearms, grease-blackened hands. Body angled three-quarters to camera-right, seated on an upturned oil drum. Holding a chrome socket wrench in his right hand resting on his knee. MUTED desaturated mid-century color palette — washed-out Kodachrome look (NOT sepia). Plain warm-neutral garage background — corrugated metal wall blurred behind him, fluorescent shop tubes glowing softly. Soft cool overhead light with a warm fill. Photorealistic.',
+      rightFigurePrompt:
+        'Photoreal portrait of a 47-year-old 1955 American working-class woman, brown hair in a kerchief tied at the back, calm steady gaze toward camera, faint smile lines. Wearing a chambray work shirt rolled to the elbows over a simple cotton skirt, a small Bakelite brooch at the collar. Standing facing camera, holding a chrome thermos and a packed metal lunch pail with both hands at waist height. MUTED desaturated mid-century color palette to match the left figure (NOT sepia). Plain warm-neutral domestic background — a 1950s kitchen window with faded gingham curtains blurred behind her. Soft natural window light from the right. Photorealistic.',
+    },
+  ],
+};
+
 export const CHANNELS: Record<Channel, ChannelConfig> = {
   garden: {
     id: 'garden',
@@ -235,6 +312,17 @@ export const CHANNELS: Record<Channel, ChannelConfig> = {
       listicle: HERITAGE_LISTICLE_AI_THUMBNAIL,
     },
     voice: HERITAGE_VOICE,
+  },
+  s1950s: {
+    id: 's1950s',
+    label: '1950s',
+    imageMode: 'ai',
+    supportedScriptTypes: ['listicle'],
+    thumbnail: {},
+    aiThumbnail: {
+      listicle: S1950S_LISTICLE_AI_THUMBNAIL,
+    },
+    voice: S1950S_VOICE,
   },
 };
 

@@ -176,8 +176,23 @@ export default function PackageForm() {
 
   // Heritage / AI-image studio state
   const [heritagePrompts, setHeritagePrompts] = useState<HeritagePromptResponse | null>(null);
-  const [heritageSubMode, setHeritageSubMode] = useState<HeritageCenterSubMode>('object');
+  const [heritageSubMode, setHeritageSubMode] = useState<HeritageCenterSubMode>('auto');
   const [heritageLoading, setHeritageLoading] = useState(false);
+
+  /** Subtitle for flanking-figure cards in the prompt studio — channel-specific. */
+  const flankSubtitle = useMemo(() => {
+    if (channel === 'heritage') return 'Sepia · 1800s flanking person';
+    if (channel === 's1950s') return 'Muted Kodachrome · 1950s flanking person';
+    return 'Channel-styled flanking person';
+  }, [channel]);
+
+  // When the channel changes, snap the sub-mode to whatever the new channel actually supports.
+  useEffect(() => {
+    if (!aiThumbnailSpec) return;
+    if (!aiThumbnailSpec.centerSubModes.includes(heritageSubMode)) {
+      setHeritageSubMode(aiThumbnailSpec.centerSubModes[0]);
+    }
+  }, [aiThumbnailSpec, heritageSubMode]);
 
   // Restore session
   useEffect(() => {
@@ -631,7 +646,7 @@ export default function PackageForm() {
     setThumbnailPngUrl(null);
     setSelectedCellIdx(null);
     setHeritagePrompts(null);
-    setHeritageSubMode('object');
+    setHeritageSubMode('auto');
     setError('');
     clearPackageSession().catch(() => {});
   }
@@ -794,6 +809,8 @@ export default function PackageForm() {
             isLoading={isLoading || seoLoading || heritageLoading}
           />
           <HeritagePromptStudio
+            channelLabel={channelConfig.label}
+            flankSubtitle={flankSubtitle}
             data={heritagePrompts}
             centerSubMode={heritageSubMode}
             supportedSubModes={aiThumbnailSpec.centerSubModes}
