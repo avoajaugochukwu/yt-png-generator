@@ -188,7 +188,7 @@ export default function PackageForm() {
   /** Subtitle for flanking-figure cards in the prompt studio — channel-specific. */
   const flankSubtitle = useMemo(() => {
     if (channel === 'heritage') return 'Sepia · 1800s flanking person';
-    if (channel === 's1950s') return 'Muted Kodachrome · 1950s flanking person';
+    if (channel === 's1950s') return 'Sepia · 1950s flanking person';
     return 'Channel-styled flanking person';
   }, [channel]);
 

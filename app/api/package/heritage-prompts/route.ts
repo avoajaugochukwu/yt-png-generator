@@ -147,7 +147,7 @@ ${subModeTaskBlock}
 5. prompts.rightFigure — description + exactly 3 prompt variations. Different person from leftFigure. Different hand-prop than leftFigure but topically related. Obey the right-figure style anchor.
 
 Hard rules:
-- Both flanking figures honor the channel's flank palette anchor (sepia for Heritage, muted Kodachrome for 1950s — do NOT mix).
+- Both flanking figures honor the channel's flank palette anchor (sepia for Heritage, sepia for 1950s — desaturated warm-tone aged-photo look in both cases).
 - Center for any "job"-style sub-mode must NOT show the worker's face.
 - Every prompt must read as photoreal photography, not illustration / painting / 3D.
 - Every prompt must anchor the era declared in the channel's style anchors. NEVER include items from a later era than the channel covers.
