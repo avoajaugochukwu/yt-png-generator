@@ -96,7 +96,7 @@ rightFigure: "${ex.rightFigurePrompt}"`,
           .map((m) => `"${m}"`)
           .join(', ')}. Output the chosen value (NOT "auto"). Pick:
    - "tool" when the listicle items are tools, instruments, or equipment.
-   - "job" when the items are occupations, trades, or roles (faceless worker mid-action).
+   - "job" when the items are occupations, trades, or roles (rendered per the channel's "job" anchor — read it carefully; some channels show a faceless worker, others show the iconic equipment of that occupation).
    - "food" when the items are foods, dishes, or meals.
    - "location" when the items are places, buildings, or sites.
    - "object" only as a catch-all if none of the above fit.
@@ -147,11 +147,14 @@ ${subModeTaskBlock}
 5. prompts.rightFigure — description + exactly 3 prompt variations. Different person from leftFigure. Different hand-prop than leftFigure but topically related. Obey the right-figure style anchor.
 
 Hard rules:
-- Both flanking figures honor the channel's flank palette anchor (sepia for Heritage, sepia for 1950s — desaturated warm-tone aged-photo look in both cases).
-- Center for any "job"-style sub-mode must NOT show the worker's face.
+- Both flanking figures honor the channel's flank palette anchor — they must read as authentic SCANNED period-film photographs (visible film grain, paper-print texture, halation, gentle edge vignette, deep desaturated sepia with muddy-brown shadows and cream highlights, higher-than-modern contrast, weathered/lived-in subject with real skin texture and worn period-correct clothing). They must NOT look like a modern stock-photo subject with a sepia filter applied. Bake explicit grit cues (e.g. "Kodachrome / Tri-X-era film grain", "paper-print texture", "halation in highlights", "muddy-brown shadows", "weathered face", "faded/worn clothing", "reads as a scanned 1950s photograph, not a modern photo with a sepia filter") into every flank prompt — do not assume the model will infer them.
+- Both flanking figures must FACE INWARD toward the center panel. Left figure's body and face turn slightly to camera-right (gaze landing just off-camera to the right, toward the inside edge of the panel). Right figure's body and face turn slightly to camera-left (gaze landing just off-camera to the left, toward the inside edge of the panel). They are NOT looking straight into the lens. State the inward-facing direction explicitly in every flank prompt. The lighting direction in each flank prompt should match the gaze direction (light from the inside edge so the lit side of the face is the side facing center).
+- Center is a TIGHT EXTREME CLOSE-UP of a single hero subject that fills roughly 70-90% of the frame edge-to-edge, with dark blurred-out vignette edges (out-of-focus dim background that frames the hero). State both the close-up framing and the dark blurred-edge vignette explicitly in every center prompt.
+- Center subjects must be the WEIRDEST / MOST VISUALLY ARRESTING period-correct option for the topic — strange shapes, exposed mechanisms, unusual coils/valves/gauges, glowing or dripping or smoking elements, period-specific oddness. Before writing each of the 3 center variations, brainstorm at least 5 candidate period-correct hero subjects and pick the most odd-looking, attention-grabbing one for that variation. Each variation must feature a DIFFERENT odd-looking subject.
+- Center for any "job"-style sub-mode follows the channel's per-sub-mode "job" anchor — read it carefully. If the anchor specifies equipment-of-the-occupation (no people), the center is the iconic gear of that trade with NO people, NO hands, NO faces. If the anchor specifies a faceless worker, the worker's face must NOT show.
 - Every prompt must read as photoreal photography, not illustration / painting / 3D.
 - Every prompt must anchor the era declared in the channel's style anchors. NEVER include items from a later era than the channel covers.
-- Center subject must be SINGULAR — one hero artifact / one worker / one food item / one location. No collages.
+- Center subject must be SINGULAR — one hero artifact / one piece of equipment / one food item / one location. No collages.
 
 === OUTPUT FORMAT (strict JSON) ===
 {
